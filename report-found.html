@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Report Found Item - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="page-topbar">
+      <div>
+        <h1 class="page-title-left">Report Found Item</h1>
+        <p id="welcomeUser" class="subtitle left-subtitle">Write accurate details and where the item was handed in.</p>
+      </div>
+
+      <div class="profile-menu-wrap">
+        <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
+        <div id="profileDropdown" class="profile-dropdown">
+          <a href="./dashboard.html">Dashboard</a>
+          <a href="./profile.html">Profile</a>
+          <a href="./my-reports.html">My Reports</a>
+          <a href="./support.html">Support</a>
+          <a href="./settings.html">Settings</a>
+          <a href="#" id="logoutBtn">Logout</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-panel">
+      <form id="foundItemForm">
+        <input type="text" id="foundItemName" placeholder="Item Name" required />
+
+        <select id="foundCategory" required>
+          <option value="">Select Category</option>
+          <option value="Electronics">Electronics</option>
+          <option value="Books">Books</option>
+          <option value="ID Card">ID Card</option>
+          <option value="Keys">Keys</option>
+          <option value="Bags">Bags</option>
+          <option value="Clothes">Clothes</option>
+          <option value="Others">Others</option>
+        </select>
+
+        <textarea id="foundDescription" placeholder="Describe the found item" required></textarea>
+  
+        <textarea id="foundUniqueMarks" placeholder="Unique marks you noticed: color, stickers, scratches, engraving, contents, or other identifying details"></textarea>
+
+        <label for="dateFound">Date Found</label>
+        <input type="date" id="dateFound" required />
+
+        <input type="text" id="locationFound" placeholder="Location Found" required />
+        <input type="text" id="handInLocation" placeholder="Where was it handed in?" required />
+
+        <textarea id="privateNote" placeholder="Private verification note (admin only)" required></textarea>
+
+        <input type="file" id="foundImage" accept="image/*" />
+        <img id="foundImagePreview" alt="Found Item Preview" />
+
+        <button type="submit">Submit Found Item Report</button>
+      </form>
+
+      <p id="message"></p>
+    </div>
+
+    <div class="back-link-row">
+      <a href="./dashboard.html">Back to Dashboard</a>
+      <a href="./support.html">Support</a>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

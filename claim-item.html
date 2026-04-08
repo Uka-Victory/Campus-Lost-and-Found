@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Claim Item - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="page-topbar">
+      <div>
+        <h1 class="page-title-left">Claim Found Item</h1>
+        <p id="welcomeUser" class="subtitle left-subtitle">Select one of your lost reports first, then choose a matching found-item report.</p>
+      </div>
+
+      <div class="profile-menu-wrap">
+        <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
+        <div id="profileDropdown" class="profile-dropdown">
+          <a href="./dashboard.html">Dashboard</a>
+          <a href="./profile.html">Profile</a>
+          <a href="./my-reports.html">My Reports</a>
+          <a href="./support.html">Support</a>
+          <a href="./settings.html">Settings</a>
+          <a href="#" id="logoutBtn">Logout</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-panel">
+      <form id="claimForm">
+        <label for="claimLostItemId">Select Your Lost Report</label>
+        <select id="claimLostItemId" required>
+          <option value="">Loading your lost reports...</option>
+        </select>
+
+        <label for="claimFoundItemId">Select Matching Found Item Report</label>
+        <select id="claimFoundItemId" required>
+          <option value="">Select your lost report first</option>
+        </select>
+
+        <p id="claimMatchMessage" class="subtitle left-subtitle"></p>
+
+        <label for="claimItemName">Item Name</label>
+        <input type="text" id="claimItemName" placeholder="Item Name" readonly />
+
+        <textarea id="claimReason" placeholder="Why do you believe this item is yours?" required></textarea>
+        <textarea id="claimDescription" placeholder="Describe the item in detail" required></textarea>
+        <textarea id="claimUniqueMarks" placeholder="State unique identifying marks" required></textarea>
+        <textarea id="claimContents" placeholder="Mention contents/accessories if any" required></textarea>
+        <input type="text" id="claimLostPlace" placeholder="Where did you lose it?" required />
+        <input type="date" id="claimLostDate" required />
+
+        <button type="submit">Submit Claim</button>
+      </form>
+
+      <p id="message"></p>
+    </div>
+
+    <div class="back-link-row">
+      <a href="./dashboard.html">Back to Dashboard</a>
+      <a href="./support.html">Support</a>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

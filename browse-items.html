@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Browse Items - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="home-topbar">
+      <div class="brand">Campus Lost &amp; Found</div>
+      <div class="home-links">
+        <a href="./index.html" class="nav-pill">Home</a>
+        <a href="./support.html" class="nav-pill">Support</a>
+        <a href="./login.html" id="navLogin" class="nav-pill">Login</a>
+        <a href="./register.html" id="navRegister" class="nav-pill nav-pill-primary">Register</a>
+        <a href="./dashboard.html" id="navDashboard" class="nav-pill nav-pill-primary" style="display: none;">Dashboard</a>
+      </div>
+    </div>
+
+    <h1>Browse Items</h1>
+    <p class="subtitle">Search by item name and filter by category. Closed reports are hidden from public browsing.</p>
+
+    <div class="search-stack">
+      <input type="text" id="searchInput" placeholder="Search by item name or category" />
+
+      <select id="categoryFilter">
+        <option value="">All Categories</option>
+        <option value="Electronics">Electronics</option>
+        <option value="Books">Books</option>
+        <option value="ID Card">ID Card</option>
+        <option value="Keys">Keys</option>
+        <option value="Bags">Bags</option>
+        <option value="Clothes">Clothes</option>
+        <option value="Others">Others</option>
+      </select>
+
+      <button id="searchBtn">Search</button>
+    </div>
+
+    <div class="items-box">
+      <h3>Lost Items</h3>
+      <div id="lostItemsList"></div>
+    </div>
+
+    <div class="items-box">
+      <h3>Found Items</h3>
+      <div id="foundItemsList"></div>
+    </div>
+
+    <div class="back-link-row">
+      <a href="./index.html">Back to Home</a>
+      <a href="./dashboard.html">Dashboard</a>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Dashboard - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="page-topbar">
+      <div>
+        <h1 class="page-title-left">Dashboard</h1>
+        <p id="welcomeUser" class="subtitle left-subtitle">Welcome.</p>
+      </div>
+
+      <div class="profile-menu-wrap">
+        <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
+        <div id="profileDropdown" class="profile-dropdown">
+          <a href="./dashboard.html">Dashboard</a>
+          <a href="./profile.html">Profile</a>
+          <a href="./my-reports.html">My Reports</a>
+          <a href="./support.html">Support</a>
+          <a href="./settings.html">Settings</a>
+          <a href="#" id="logoutBtn">Logout</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <a href="./report-lost.html" class="dashboard-card">
+        <h3>Report Lost Item</h3>
+        <p>Submit details of an item you lost on campus.</p>
+      </a>
+
+      <a href="./report-found.html" class="dashboard-card">
+        <h3>Report Found Item</h3>
+        <p>Post details of an item you found and where it was kept.</p>
+      </a>
+
+      <a href="./browse-items.html" class="dashboard-card">
+        <h3>Browse Items</h3>
+        <p>Search through lost and found reports.</p>
+      </a>
+
+      <a href="./claim-item.html" class="dashboard-card">
+        <h3>Claim Item</h3>
+        <p>Submit proof and verification details for a found item.</p>
+      </a>
+
+      <a href="./support.html" class="dashboard-card">
+        <h3>Support</h3>
+        <p>Get help with login, reports, matching, claims, and notifications.</p>
+      </a>
+
+      <a href="./settings.html" class="dashboard-card">
+        <h3>Appearance & Settings</h3>
+        <p>Change theme mode and manage your account details.</p>
+      </a>
+    </div>
+
+    <div class="items-box">
+      <h3>Notifications</h3>
+      <p class="helper-note">Possible matches and report updates will show here.</p>
+      <div id="notificationsList"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Support - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container home-container">
+    <div class="home-topbar">
+      <div class="brand">Campus Lost &amp; Found</div>
+      <div class="home-links">
+        <a href="./index.html" class="nav-pill">Home</a>
+        <a href="./browse-items.html" class="nav-pill">Browse</a>
+        <a href="./login.html" id="navLogin" class="nav-pill">Login</a>
+        <a href="./register.html" id="navRegister" class="nav-pill nav-pill-primary">Register</a>
+        <a href="./dashboard.html" id="navDashboard" class="nav-pill nav-pill-primary" style="display: none;">Dashboard</a>
+      </div>
+    </div>
+
+    <div class="hero-box">
+      <h1>Support Center</h1>
+      <p class="subtitle">
+        Get help with login, reporting items, claim verification, notifications, and general portal use.
+      </p>
+
+      <div class="hero-actions">
+        <a href="./dashboard.html" class="hero-btn">Go to Dashboard</a>
+        <a href="./settings.html" class="hero-btn hero-btn-outline">Open Settings</a>
+        <a href="./login.html" class="hero-btn hero-btn-soft">Forgot Password Page</a>
+      </div>
+    </div>
+
+    <div class="support-grid">
+      <div class="support-card">
+        <span class="support-badge">Account Help</span>
+        <h3>Login and Password Help</h3>
+        <p>Use the forgot password link on the login page to request a password reset email.</p>
+        <ul class="panel-list">
+          <li>Enter the same email address used during registration.</li>
+          <li>Check inbox and spam folder for the reset email.</li>
+          <li>If your email changed, update it from Settings after login.</li>
+        </ul>
+      </div>
+
+      <div class="support-card">
+        <span class="support-badge">Lost Item Reports</span>
+        <h3>Reporting a Lost Item</h3>
+        <p>Give clear details like category, date lost, location, description, and unique marks.</p>
+        <ul class="panel-list">
+          <li>Use unique marks to improve matching.</li>
+          <li>Be specific about where you last saw the item.</li>
+          <li>Only open reports should remain unresolved.</li>
+        </ul>
+      </div>
+
+      <div class="support-card">
+        <span class="support-badge">Found Item Reports</span>
+        <h3>Reporting a Found Item</h3>
+        <p>State where the item was found and where it was handed in.</p>
+        <ul class="panel-list">
+          <li>Write identifying details carefully.</li>
+          <li>Use private verification notes for admin-only checks.</li>
+          <li>Keep the report accurate so matching works better.</li>
+        </ul>
+      </div>
+
+      <div class="support-card">
+        <span class="support-badge">Claim Help</span>
+        <h3>Claim Verification</h3>
+        <p>Claims should be submitted through your own lost report, then matched with a found report.</p>
+        <ul class="panel-list">
+          <li>Choose your lost report first.</li>
+          <li>Then choose a matching found report.</li>
+          <li>Give proof details honestly and clearly.</li>
+        </ul>
+      </div>
+
+      <div class="support-card">
+        <span class="support-badge">Notifications</span>
+        <h3>Possible Match Alerts</h3>
+        <p>The system can notify users when similar lost and found items appear.</p>
+        <ul class="panel-list">
+          <li>Check your dashboard notifications often.</li>
+          <li>Matching is helpful but not perfect.</li>
+          <li>Admins still review important claim actions.</li>
+        </ul>
+      </div>
+
+      <div class="support-card">
+        <span class="support-badge">Passport Upload</span>
+        <h3>Passport Image</h3>
+        <p>Passport upload is optional for now.</p>
+        <ul class="panel-list">
+          <li>You can still register and log in without it.</li>
+          <li>You can update it later from Settings.</li>
+          <li>If upload fails, it should not stop normal use of the portal.</li>
+        </ul>
+      </div>
+
+      <div class="support-card">
+        <span class="support-badge">Need More Help?</span>
+        <h3>Practical Next Steps</h3>
+        <p>If something looks wrong in the portal, gather the page name and what happened before asking for help.</p>
+        <ul class="panel-list">
+          <li>Say the exact page where the issue happened.</li>
+          <li>Say what you expected to happen.</li>
+          <li>Say what actually happened instead.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="settings-panel">
+      <h3>Quick Help Links</h3>
+      <div class="quick-links">
+        <a href="./login.html" class="quick-link">Forgot Password</a>
+        <a href="./report-lost.html" class="quick-link">Report Lost Item</a>
+        <a href="./report-found.html" class="quick-link">Report Found Item</a>
+        <a href="./claim-item.html" class="quick-link">Claim Item</a>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

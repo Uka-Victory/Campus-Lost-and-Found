@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>My Reports - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="page-topbar">
+      <div>
+        <h1 class="page-title-left">My Reports</h1>
+        <p id="welcomeUser" class="subtitle left-subtitle">View the reports and claims you submitted.</p>
+      </div>
+
+      <div class="profile-menu-wrap">
+        <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
+        <div id="profileDropdown" class="profile-dropdown">
+          <a href="./dashboard.html">Dashboard</a>
+          <a href="./profile.html">Profile</a>
+          <a href="./my-reports.html">My Reports</a>
+          <a href="./support.html">Support</a>
+          <a href="./settings.html">Settings</a>
+          <a href="#" id="logoutBtn">Logout</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="items-box">
+      <h3>My Lost Item Reports</h3>
+      <div id="myLostItemsList"></div>
+    </div>
+
+    <div class="items-box">
+      <h3>My Found Item Reports</h3>
+      <div id="myFoundItemsList"></div>
+    </div>
+
+    <div class="items-box">
+      <h3>My Claims</h3>
+      <div id="myClaimsList"></div>
+    </div>
+
+    <div class="back-link-row">
+      <a href="./dashboard.html">Back to Dashboard</a>
+      <a href="./support.html">Support</a>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

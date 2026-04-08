@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Settings - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="page-topbar">
+      <div>
+        <h1 class="page-title-left">Settings</h1>
+        <p class="subtitle left-subtitle">Manage appearance, account information, security, and support access.</p>
+      </div>
+
+      <div class="profile-menu-wrap">
+        <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
+        <div id="profileDropdown" class="profile-dropdown">
+          <a href="./dashboard.html">Dashboard</a>
+          <a href="./profile.html">Profile</a>
+          <a href="./my-reports.html">My Reports</a>
+          <a href="./support.html">Support</a>
+          <a href="./settings.html">Settings</a>
+          <a href="#" id="logoutBtn">Logout</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-layout">
+      <div>
+        <div class="settings-panel">
+          <span class="theme-chip">Appearance</span>
+          <h3>Theme Mode</h3>
+          <p class="helper-note">Choose how the portal should look on this device.</p>
+
+          <div class="theme-grid">
+            <button type="button" id="themeLightBtn" class="theme-option">
+              <span class="theme-option-title">Light</span>
+              <span class="theme-option-text">Bright, clean interface</span>
+            </button>
+
+            <button type="button" id="themeDarkBtn" class="theme-option">
+              <span class="theme-option-title">Dark</span>
+              <span class="theme-option-text">Low-light friendly look</span>
+            </button>
+
+            <button type="button" id="themeAutoBtn" class="theme-option">
+              <span class="theme-option-title">Auto</span>
+              <span class="theme-option-text">Follow phone theme</span>
+            </button>
+          </div>
+
+          <p id="currentThemeLabel" class="info-note">Current theme: Auto</p>
+        </div>
+
+        <div class="settings-panel">
+          <span class="theme-chip">Support</span>
+          <h3>Need Help?</h3>
+          <p class="helper-note">Use the support page for help with login, claims, reports, and notifications.</p>
+
+          <div class="quick-links">
+            <a href="./support.html" class="quick-link">Open Support Center</a>
+            <a href="./login.html" class="quick-link">Forgot Password Page</a>
+          </div>
+
+          <div class="section-divider"></div>
+          <p class="helper-note">Forgot password is still available on the login page.</p>
+        </div>
+      </div>
+
+      <div class="settings-panel">
+        <span class="theme-chip">Account</span>
+        <h3>Update Account Details</h3>
+        <p class="helper-note">You can update your personal details, email, password, and passport image here.</p>
+
+        <form id="settingsForm">
+          <input type="text" id="settingsFullName" placeholder="Full Name" required />
+          <input type="text" id="settingsPhone" placeholder="Phone Number" required />
+          <input type="email" id="settingsEmail" placeholder="Email Address" required />
+          <input type="text" id="settingsFaculty" placeholder="Faculty" required />
+          <input type="text" id="settingsDepartment" placeholder="Department" required />
+          <input type="text" id="settingsLevel" placeholder="Level" required />
+
+          <label for="currentPassword">Current Password (needed for email or password change)</label>
+          <input type="password" id="currentPassword" placeholder="Current Password" />
+
+          <label for="newPassword">New Password (optional)</label>
+          <input type="password" id="newPassword" placeholder="New Password" />
+
+          <label for="confirmNewPassword">Confirm New Password</label>
+          <input type="password" id="confirmNewPassword" placeholder="Confirm New Password" />
+
+          <label for="settingsPassport">Upload Passport</label>
+          <input type="file" id="settingsPassport" accept="image/*" />
+          <img id="settingsPassportPreview" alt="Passport Preview" />
+          <p class="helper-note">Passport upload is optional for now. You can add or change it later.</p>
+
+          <button type="submit">Save Changes</button>
+        </form>
+
+        <p id="message"></p>
+      </div>
+    </div>
+
+    <div class="back-link-row">
+      <a href="./dashboard.html">Back to Dashboard</a>
+      <a href="./support.html">Open Support</a>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

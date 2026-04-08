@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container home-container">
+    <div class="home-topbar">
+      <div class="brand">Campus Lost &amp; Found</div>
+      <div class="home-links">
+        <a href="./support.html" class="nav-pill">Support</a>
+        <a href="./login.html" id="navLogin" class="nav-pill">Login</a>
+        <a href="./register.html" id="navRegister" class="nav-pill nav-pill-primary">Register</a>
+        <a href="./dashboard.html" id="navDashboard" class="nav-pill nav-pill-primary" style="display: none;">Dashboard</a>
+      </div>
+    </div>
+
+    <div class="hero-box">
+      <h1>Campus Lost and Found Portal</h1>
+      <p class="subtitle">
+        Report lost items, post found items, search public listings, and reconnect people with their belongings without campus chaos.
+      </p>
+
+      <div class="hero-actions">
+        <a href="./register.html" class="hero-btn">Create Account</a>
+        <a href="./login.html" class="hero-btn hero-btn-outline">Login</a>
+        <a href="./browse-items.html" class="hero-btn hero-btn-soft">Browse Items</a>
+      </div>
+    </div>
+
+    <div class="feature-grid">
+      <div class="items-box">
+        <h3>Report Lost Items</h3>
+        <p>Submit details about something you lost on campus with useful identifying information.</p>
+      </div>
+
+      <div class="items-box">
+        <h3>Report Found Items</h3>
+        <p>Post details about items found and where they were kept for easy recovery.</p>
+      </div>
+
+      <div class="items-box">
+        <h3>Claim Verification</h3>
+        <p>Claims are tied to a user’s own lost report before admin review happens.</p>
+      </div>
+
+      <div class="items-box">
+        <h3>Support and Theme Control</h3>
+        <p>Use the support center for help and the settings page for light, dark, or auto mode.</p>
+      </div>
+    </div>
+
+    <div class="quick-links">
+      <a href="./support.html" class="quick-link">Open Support Center</a>
+      <a href="./browse-items.html" class="quick-link">Browse Public Items</a>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Register - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="home-topbar">
+      <div class="brand">Campus Lost &amp; Found</div>
+      <div class="home-links">
+        <a href="./index.html" class="nav-pill">Home</a>
+        <a href="./support.html" class="nav-pill">Support</a>
+        <a href="./login.html" class="nav-pill">Login</a>
+      </div>
+    </div>
+
+    <div class="auth-shell">
+      <div class="auth-card">
+        <h1>Student Registration</h1>
+        <p class="subtitle">Create your account to report items, claim matches, and receive notifications.</p>
+
+        <form id="registerForm">
+          <input type="text" id="matricNo" placeholder="Matriculation Number" required />
+          <input type="text" id="fullName" placeholder="Full Name" required />
+          <input type="text" id="phone" placeholder="Phone Number" required />
+          <input type="email" id="email" placeholder="Email Address" required />
+          <input type="text" id="faculty" placeholder="Faculty" required />
+          <input type="text" id="department" placeholder="Department" required />
+          <input type="text" id="level" placeholder="Level" required />
+          <input type="file" id="passport" accept="image/*" />
+          <img id="passportPreview" alt="Passport Preview" />
+          <input type="password" id="password" placeholder="Password" required />
+          <input type="password" id="confirmPassword" placeholder="Confirm Password" required />
+
+          <button type="submit">Register</button>
+        </form>
+
+        <p id="message"></p>
+        <p>Already have an account? <a href="./login.html">Login</a></p>
+      </div>
+
+      <div class="auth-aside">
+        <span class="support-badge">Registration Tips</span>
+        <h3>Before you submit</h3>
+        <ul class="panel-list">
+          <li>Check that your email is correct.</li>
+          <li>Your passport image can be added now or later if needed.</li>
+          <li>Use a password you can remember easily.</li>
+        </ul>
+
+        <div class="auth-links">
+          <a href="./support.html" class="quick-link">Open Support</a>
+          <a href="./browse-items.html" class="quick-link">Browse Items</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

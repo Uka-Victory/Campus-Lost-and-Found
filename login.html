@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("campusLostFoundTheme") || "auto";
+      const resolvedTheme = savedTheme === "auto"
+        ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+        : savedTheme;
+      document.documentElement.setAttribute("data-theme", resolvedTheme);
+      document.documentElement.setAttribute("data-theme-mode", savedTheme);
+    })();
+  </script>
+  <title>Login - Campus Lost and Found Portal</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="home-topbar">
+      <div class="brand">Campus Lost &amp; Found</div>
+      <div class="home-links">
+        <a href="./index.html" class="nav-pill">Home</a>
+        <a href="./support.html" class="nav-pill">Support</a>
+        <a href="./register.html" class="nav-pill nav-pill-primary">Register</a>
+      </div>
+    </div>
+
+    <div class="auth-shell">
+      <div class="auth-card">
+        <h1>Student Login</h1>
+        <p class="subtitle">Sign in to manage reports, claims, notifications, and settings.</p>
+
+        <form id="loginForm">
+          <input type="email" id="loginEmail" placeholder="Email Address" required />
+          <input type="password" id="loginPassword" placeholder="Password" required />
+          <button type="submit">Login</button>
+          <p><a href="#" id="forgotPasswordLink">Forgot Password?</a></p>
+        </form>
+
+        <p id="message"></p>
+        <p>Don't have an account? <a href="./register.html">Register</a></p>
+      </div>
+
+      <div class="auth-aside">
+        <span class="support-badge">Quick Help</span>
+        <h3>Need help signing in?</h3>
+        <ul class="panel-list">
+          <li>Use the same email address used during registration.</li>
+          <li>The forgot password link is still available on this page.</li>
+          <li>Check the support center for common fixes.</li>
+        </ul>
+
+        <div class="auth-links">
+          <a href="./support.html" class="quick-link">Open Support</a>
+          <a href="./browse-items.html" class="quick-link">Browse Items</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
