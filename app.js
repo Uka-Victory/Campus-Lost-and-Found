@@ -1691,10 +1691,26 @@ window.deleteClaimReport = async function (reportId) {
 };
 
 /* NOTIFICATIONS */
+// Setup bell dropdown toggle
+const notifBtn = document.getElementById("notifBtn");
+const notifDropdown = document.getElementById("notifDropdown");
+if (notifBtn && notifDropdown) {
+  notifBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    notifDropdown.classList.toggle("show");
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!notifDropdown.contains(e.target) && e.target !== notifBtn) {
+      notifDropdown.classList.remove("show");
+    }
+  });
+}
+
 async function loadNotifications(userId) {
   if (!notificationsList) return;
 
-  notificationsList.innerHTML = "Loading notifications...";
+  notificationsList.innerHTML = "Loading...";
 
   try {
     const snapshot = await getDocs(collection(db, "notifications"));
@@ -1703,22 +1719,32 @@ async function loadNotifications(userId) {
     snapshot.forEach((docItem) => {
       const data = docItem.data();
       if (data.userId === userId) {
-        items.push(data);
+        items.push({ id: docItem.id, ...data });
       }
     });
 
     items.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
-
     notificationsList.innerHTML = "";
 
+    const notifBadge = document.getElementById("notifBadge");
+    if (notifBadge) {
+      if (items.length > 0) {
+        notifBadge.textContent = items.length;
+        notifBadge.style.display = "inline-block";
+      } else {
+        notifBadge.style.display = "none";
+      }
+    }
+
     if (items.length === 0) {
-      notificationsList.innerHTML = "<p>No notifications yet.</p>";
+      notificationsList.innerHTML = "<p>No new notifications.</p>";
       return;
     }
 
-    items.slice(0, 10).forEach((item) => {
+    items.slice(0, 15).forEach((item) => {
       notificationsList.innerHTML += `
-        <div class="notification-item notification-${item.type || "info"}">
+        <div class="notification-item notif-item-small notification-${item.type || "info"}">
+          <button class="notif-delete-btn" onclick="window.deleteNotification('${item.id}')">✖</button>
           <p><strong>${item.title}</strong></p>
           <p>${item.text}</p>
         </div>
@@ -1729,6 +1755,17 @@ async function loadNotifications(userId) {
     console.log(error);
   }
 }
+
+// Global function to delete a notification
+window.deleteNotification = async function (notifId) {
+  if (!confirm("Delete this notification?")) return;
+  try {
+    await deleteDoc(doc(db, "notifications", notifId));
+    await refreshVisiblePages(); 
+  } catch (error) {
+    console.log("Error deleting notification:", error);
+  }
+};
 
 /* ADMIN */
 async function updateClaimStatus(claimId, status) {

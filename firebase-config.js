@@ -4,12 +4,12 @@ import { getFirestore } from "https://www.gstatic.com/firebasejs/12.10.0/firebas
 import { getStorage } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-storage.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAF3S38kmOCmrjRpptnSF5fwphl--4rAJE",
-  authDomain: "campus-lost-and-found-po-358c2.firebaseapp.com",
-  projectId: "campus-lost-and-found-po-358c2",
-  storageBucket: "campus-lost-and-found-po-358c2.firebasestorage.app",
-  messagingSenderId: "753591221921",
-  appId: "1:753591221921:web:fe193a2f33ce31a11abae0"
+  apiKey: "AIzaSyBg2cNQMmdyqehz9nUPHFtoUcJChp1sl5I",
+  authDomain: "campus-lost-found-v2-7d7f0.firebaseapp.com",
+  projectId: "campus-lost-found-v2-7d7f0",
+  storageBucket: "campus-lost-found-v2-7d7f0.firebasestorage.app",
+  messagingSenderId: "527226852697",
+  appId: "1:527226852697:web:ccd3f919395e04a8de6848"
 };
 
 const app = initializeApp(firebaseConfig);

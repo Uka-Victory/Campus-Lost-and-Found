@@ -24,15 +24,27 @@
         <p id="welcomeUser" class="subtitle left-subtitle">Welcome.</p>
       </div>
 
-      <div class="profile-menu-wrap">
-        <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
-        <div id="profileDropdown" class="profile-dropdown">
-          <a href="./dashboard.html">Dashboard</a>
-          <a href="./profile.html">Profile</a>
-          <a href="./my-reports.html">My Reports</a>
-          <a href="./support.html">Support</a>
-          <a href="./settings.html">Settings</a>
-          <a href="#" id="logoutBtn">Logout</a>
+      <div style="display: flex; gap: 10px;">
+        <div class="notification-wrap">
+          <button type="button" id="notifBtn" class="profile-menu-btn" style="position: relative;">
+            🔔 <span id="notifBadge" class="notif-badge" style="display: none;">0</span>
+          </button>
+          <div id="notifDropdown" class="profile-dropdown notif-dropdown">
+            <div class="notif-header">Notifications</div>
+            <div id="notificationsList" class="notif-body"></div>
+          </div>
+        </div>
+
+        <div class="profile-menu-wrap">
+          <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
+          <div id="profileDropdown" class="profile-dropdown">
+            <a href="./dashboard.html">Dashboard</a>
+            <a href="./profile.html">Profile</a>
+            <a href="./my-reports.html">My Reports</a>
+            <a href="./support.html">Support</a>
+            <a href="./settings.html">Settings</a>
+            <a href="#" id="logoutBtn">Logout</a>
+          </div>
         </div>
       </div>
     </div>
@@ -67,12 +79,6 @@
         <h3>Appearance & Settings</h3>
         <p>Change theme mode and manage your account details.</p>
       </a>
-    </div>
-
-    <div class="items-box">
-      <h3>Notifications</h3>
-      <p class="helper-note">Possible matches and report updates will show here.</p>
-      <div id="notificationsList"></div>
     </div>
   </div>
 
