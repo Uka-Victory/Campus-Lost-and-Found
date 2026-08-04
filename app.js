@@ -86,6 +86,8 @@ const profileFaculty = document.getElementById("profileFaculty");
 const profileDepartment = document.getElementById("profileDepartment");
 const profileLevel = document.getElementById("profileLevel");
 const profileRole = document.getElementById("profileRole");
+const profileMatric = document.getElementById("profileMatric");
+const profilePassport = document.getElementById("profilePassport");
 
 const themeLightBtn = document.getElementById("themeLightBtn");
 const themeDarkBtn = document.getElementById("themeDarkBtn");
@@ -755,7 +757,7 @@ showImagePreview(settingsPassportInput, settingsPassportPreview);
 setupProfileMenu();
 setupThemeControls();
 
-/* REGISTER */
+/* REGISTER FORM WITH ATOMIC AUTH & DATABASE CLEANUP */
 if (registerForm) {
   registerForm.addEventListener("submit", async function (e) {
     e.preventDefault();
@@ -766,12 +768,7 @@ if (registerForm) {
 
     if (submitBtn?.disabled) return;
 
-    showMsg("Registering...");
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Registering...";
-    }
-
+    // 1. FRONT-END VALIDATION (Prevents calling auth if fields are missing/invalid)
     const matricNo = document.getElementById("matricNo").value.trim();
     const fullName = document.getElementById("fullName").value.trim();
     const phone = document.getElementById("phone").value.trim();
@@ -786,29 +783,35 @@ if (registerForm) {
     if (!matricNo || !fullName || !phone || !email || !faculty || !department || !level || !password || !confirmPassword) {
       showMsg("Please fill in all required fields.");
       showPopup("Please fill in all required fields.");
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Register";
-      }
+      return;
+    }
+
+    if (password.length < 6) {
+      showMsg("Password must be at least 6 characters long.");
+      showPopup("Password must be at least 6 characters long.");
       return;
     }
 
     if (password !== confirmPassword) {
       showMsg("Passwords do not match.");
       showPopup("Passwords do not match.");
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Register";
-      }
       return;
+    }
+
+    showMsg("Registering...");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Registering...";
     }
 
     let createdUser = null;
 
     try {
+      // 2. CREATE USER IN AUTHENTICATION
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       createdUser = userCredential.user;
 
+      // 3. IMMEDIATELY CREATE USER DOCUMENT IN FIRESTORE DATABASE
       await setDoc(doc(db, "users", createdUser.uid), {
         matricNo,
         fullName,
@@ -822,26 +825,15 @@ if (registerForm) {
         createdAt: new Date().toISOString()
       });
 
+      // 4. OPTIONAL PASSPORT UPLOAD (Fails silently without corrupting account)
       if (passportFile) {
         try {
           const passportUrl = await uploadImage(passportFile, "passports");
-          await updateDoc(doc(db, "users", createdUser.uid), { passportUrl });
+          if (passportUrl) {
+            await updateDoc(doc(db, "users", createdUser.uid), { passportUrl });
+          }
         } catch (passportError) {
-          console.log("Passport upload failed:", passportError);
-          showMsg("User registered successfully, but passport upload failed.");
-          showPopup("User registered successfully, but passport upload failed. You can continue and update it later.");
-
-          registerForm.reset();
-          if (passportPreview) {
-            passportPreview.src = "";
-            passportPreview.style.display = "none";
-          }
-
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = "Register";
-          }
-          return;
+          console.log("Passport upload skipped/failed:", passportError);
         }
       }
 
@@ -853,31 +845,35 @@ if (registerForm) {
         passportPreview.src = "";
         passportPreview.style.display = "none";
       }
-    } catch (error) {
-      console.log(error);
 
+    } catch (error) {
+      console.log("Registration error:", error);
+
+      // GUARANTEED CLEANUP: If Firestore doc failed, wipe the Auth user!
       if (createdUser) {
         try {
           await deleteUser(createdUser);
+          console.log("Orphan auth user successfully cleaned up.");
         } catch (cleanupError) {
-          console.log("Cleanup failed:", cleanupError);
+          console.log("Cleanup error:", cleanupError);
         }
       }
 
       let friendlyMessage = "Registration failed.";
 
       if (error.code === "auth/email-already-in-use") {
-        friendlyMessage = "This user is already registered.";
+        friendlyMessage = "This email is already registered. Please log in.";
       } else if (error.code === "auth/invalid-email") {
         friendlyMessage = "Please enter a valid email address.";
       } else if (error.code === "auth/weak-password") {
-        friendlyMessage = "Password is too weak.";
+        friendlyMessage = "Password is too weak. Please use at least 6 characters.";
       } else if (error.message) {
         friendlyMessage = error.message;
       }
 
       showMsg(friendlyMessage);
       showPopup(friendlyMessage);
+
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
@@ -947,16 +943,15 @@ if (loginForm) {
 
       const userData = userSnap.data();
       const role = userData.role || "student";
-      const passportUrl = (userData.passportUrl || "").trim();
       const normalizedRole = (role || "").trim().toLowerCase();
 
       showMsg("Login successful.");
 
-if (normalizedRole === "admin") {
-  window.location.href = "./admin.html";
-} else {
-  window.location.href = "./dashboard.html";
-}
+      if (normalizedRole === "admin") {
+        window.location.href = "./admin.html";
+      } else {
+        window.location.href = "./dashboard.html";
+      }
     } catch (error) {
       showMsg(error.message);
       console.log(error);
@@ -1015,11 +1010,15 @@ async function loadProfile(user) {
 
     profileName.textContent = data.fullName || "User";
     if (profileEmail) profileEmail.textContent = data.email || user.email || "-";
+    if (profileMatric) profileMatric.textContent = data.matricNo || "-";
     if (profilePhone) profilePhone.textContent = data.phone || "-";
     if (profileFaculty) profileFaculty.textContent = data.faculty || "-";
     if (profileDepartment) profileDepartment.textContent = data.department || "-";
     if (profileLevel) profileLevel.textContent = data.level || "-";
     if (profileRole) profileRole.textContent = data.role || "student";
+    if (profilePassport && data.passportUrl) {
+      profilePassport.src = data.passportUrl;
+    }
   } catch (error) {
     console.log(error);
   }
@@ -1077,30 +1076,30 @@ if (settingsForm) {
       }
 
       await updateDoc(userRef, {
-  fullName,
-  phone,
-  email,
-  faculty,
-  department,
-  level
-});
+        fullName,
+        phone,
+        email,
+        faculty,
+        department,
+        level
+      });
 
-let settingsMessage = "Settings updated successfully.";
+      let settingsMessage = "Settings updated successfully.";
 
-if (settingsPassportFile) {
-  try {
-    const passportUrl = await uploadImage(settingsPassportFile, "passports");
-    if (passportUrl) {
-      await updateDoc(userRef, { passportUrl });
-    }
-  } catch (passportError) {
-    console.log("Settings passport upload failed:", passportError);
-    settingsMessage = "Settings updated successfully, but passport upload failed. You can update it later.";
-  }
-}
+      if (settingsPassportFile) {
+        try {
+          const passportUrl = await uploadImage(settingsPassportFile, "passports");
+          if (passportUrl) {
+            await updateDoc(userRef, { passportUrl });
+          }
+        } catch (passportError) {
+          console.log("Settings passport upload failed:", passportError);
+          settingsMessage = "Settings updated successfully, but passport upload failed. You can update it later.";
+        }
+      }
 
-showMsg(settingsMessage);
-showPopup(settingsMessage);
+      showMsg(settingsMessage);
+      showPopup(settingsMessage);
 
       document.getElementById("currentPassword").value = "";
       document.getElementById("newPassword").value = "";
@@ -1143,44 +1142,44 @@ if (lostItemForm) {
 
     try {
       let lostImageUrl = "";
-let lostSubmitMessage = "Lost item report submitted successfully.";
+      let lostSubmitMessage = "Lost item report submitted successfully.";
 
-if (lostImageFile) {
-  try {
-    lostImageUrl = await uploadImage(lostImageFile, "lost-items");
-  } catch (imageError) {
-    console.log("Lost item image upload failed:", imageError);
-    lostSubmitMessage = "Lost item report submitted successfully, but image upload failed.";
-  }
-}
+      if (lostImageFile) {
+        try {
+          lostImageUrl = await uploadImage(lostImageFile, "lost-items");
+        } catch (imageError) {
+          console.log("Lost item image upload failed:", imageError);
+          lostSubmitMessage = "Lost item report submitted successfully, but image upload failed.";
+        }
+      }
 
-const newLostRef = await addDoc(collection(db, "lostItems"), {
-  userId: user.uid,
-  itemName,
-  category,
-  description,
-  uniqueMarks,
-  dateLost,
-  locationLost,
-  imageUrl: lostImageUrl,
-  status: "open",
-  createdAt: new Date().toISOString()
-});
+      const newLostRef = await addDoc(collection(db, "lostItems"), {
+        userId: user.uid,
+        itemName,
+        category,
+        description,
+        uniqueMarks,
+        dateLost,
+        locationLost,
+        imageUrl: lostImageUrl,
+        status: "open",
+        createdAt: new Date().toISOString()
+      });
 
-await checkPossibleMatchesForLostItem(newLostRef.id, {
-  userId: user.uid,
-  itemName,
-  category,
-  description,
-  uniqueMarks,
-  dateLost,
-  locationLost,
-  imageUrl: lostImageUrl,
-  status: "open"
-});
+      await checkPossibleMatchesForLostItem(newLostRef.id, {
+        userId: user.uid,
+        itemName,
+        category,
+        description,
+        uniqueMarks,
+        dateLost,
+        locationLost,
+        imageUrl: lostImageUrl,
+        status: "open"
+      });
 
-showMsg(lostSubmitMessage);
-showPopup(lostSubmitMessage);
+      showMsg(lostSubmitMessage);
+      showPopup(lostSubmitMessage);
       lostItemForm.reset();
 
       if (lostImagePreview) {
@@ -1219,47 +1218,47 @@ if (foundItemForm) {
 
     try {
       let foundImageUrl = "";
-let foundSubmitMessage = "Found item report submitted successfully.";
+      let foundSubmitMessage = "Found item report submitted successfully.";
 
-if (foundImageFile) {
-  try {
-    foundImageUrl = await uploadImage(foundImageFile, "found-items");
-  } catch (imageError) {
-    console.log("Found item image upload failed:", imageError);
-    foundSubmitMessage = "Found item report submitted successfully, but image upload failed.";
-  }
-}
+      if (foundImageFile) {
+        try {
+          foundImageUrl = await uploadImage(foundImageFile, "found-items");
+        } catch (imageError) {
+          console.log("Found item image upload failed:", imageError);
+          foundSubmitMessage = "Found item report submitted successfully, but image upload failed.";
+        }
+      }
 
-const newFoundRef = await addDoc(collection(db, "foundItems"), {
-  userId: user.uid,
-  itemName: foundItemName,
-  category: foundCategory,
-  description: foundDescription,
-  uniqueMarks: foundUniqueMarks,
-  dateFound,
-  locationFound,
-  handInLocation,
-  privateNote,
-  imageUrl: foundImageUrl,
-  status: "open",
-  createdAt: new Date().toISOString()
-});
+      const newFoundRef = await addDoc(collection(db, "foundItems"), {
+        userId: user.uid,
+        itemName: foundItemName,
+        category: foundCategory,
+        description: foundDescription,
+        uniqueMarks: foundUniqueMarks,
+        dateFound,
+        locationFound,
+        handInLocation,
+        privateNote,
+        imageUrl: foundImageUrl,
+        status: "open",
+        createdAt: new Date().toISOString()
+      });
 
-await checkPossibleMatchesForFoundItem(newFoundRef.id, {
-  userId: user.uid,
-  itemName: foundItemName,
-  category: foundCategory,
-  description: foundDescription,
-  uniqueMarks: foundUniqueMarks,
-  dateFound,
-  locationFound,
-  handInLocation,
-  privateNote,
-  status: "open"
-});
+      await checkPossibleMatchesForFoundItem(newFoundRef.id, {
+        userId: user.uid,
+        itemName: foundItemName,
+        category: foundCategory,
+        description: foundDescription,
+        uniqueMarks: foundUniqueMarks,
+        dateFound,
+        locationFound,
+        handInLocation,
+        privateNote,
+        status: "open"
+      });
 
-showMsg(foundSubmitMessage);
-showPopup(foundSubmitMessage);
+      showMsg(foundSubmitMessage);
+      showPopup(foundSubmitMessage);
       foundItemForm.reset();
 
       if (foundImagePreview) {
@@ -1691,7 +1690,6 @@ window.deleteClaimReport = async function (reportId) {
 };
 
 /* NOTIFICATIONS */
-// Setup bell dropdown toggle
 const notifBtn = document.getElementById("notifBtn");
 const notifDropdown = document.getElementById("notifDropdown");
 if (notifBtn && notifDropdown) {
@@ -1756,7 +1754,6 @@ async function loadNotifications(userId) {
   }
 }
 
-// Global function to delete a notification
 window.deleteNotification = async function (notifId) {
   if (!confirm("Delete this notification?")) return;
   try {
@@ -1897,7 +1894,7 @@ async function loadAdminData() {
       if (foundItem) approvedClaimKeys.add(buildItemKey(foundItem.itemName, foundItem.category));
     });
 
-   lostSnapshot.forEach((docItem) => {
+    lostSnapshot.forEach((docItem) => {
       const item = docItem.data();
       const currentStatus = normalizeText(item.status);
       const itemKey = buildItemKey(item.itemName, item.category);
@@ -2081,11 +2078,7 @@ if (adminLostItemsList || adminFoundItemsList || adminClaimsList || adminMatches
 onAuthStateChanged(auth, async (user) => {
   const path = window.location.pathname.toLowerCase();
 
-  // Grab the hidden Dashboard nav button
   const navDashboard = document.getElementById("navDashboard");
-
-  // MAGIC TRICK: Grab ALL links pointing to login or register anywhere on the page
-  // This automatically catches Nav buttons, Hero buttons, and Forgot Password links!
   const authLinks = document.querySelectorAll('a[href="./login.html"], a[href="./register.html"]');
 
   const isAdminOverviewPage = path.endsWith("/admin") || path.endsWith("/admin.html");
@@ -2104,7 +2097,6 @@ onAuthStateChanged(auth, async (user) => {
   const isProfilePage = path.endsWith("/profile") || path.endsWith("/profile.html");
 
   if (user) {
-    // IF LOGGED IN: Show Dashboard nav, Hide ALL Auth & Forgot Password links
     if (navDashboard) navDashboard.style.display = "inline-flex";
     authLinks.forEach(link => link.style.display = "none");
 
@@ -2152,10 +2144,8 @@ onAuthStateChanged(auth, async (user) => {
       console.log(error);
     }
   } else {
-    // IF NOT LOGGED IN: Hide Dashboard nav, Show Auth & Forgot Password links
     if (navDashboard) navDashboard.style.display = "none";
     
-    // Leaving the display as an empty string resets it back to its normal CSS state
     authLinks.forEach(link => link.style.display = "");
 
     if (isAdminPage || isDashboardPage || isLostPage || isFoundPage || isClaimPage || isSettingsPage || isMyReportsPage || isProfilePage) {
