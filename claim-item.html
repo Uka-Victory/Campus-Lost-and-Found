@@ -21,7 +21,7 @@
     <div class="page-topbar">
       <div>
         <h1 class="page-title-left">Claim Found Item</h1>
-        <p id="welcomeUser" class="subtitle left-subtitle">Select one of your lost reports first, then choose a matching found-item report.</p>
+        <p id="welcomeUser" class="subtitle left-subtitle">Select your lost report first, then choose an algorithm-matched found report.</p>
       </div>
 
       <div class="profile-menu-wrap">
@@ -39,7 +39,7 @@
 
     <div class="form-panel">
       <form id="claimForm">
-        <label for="claimLostItemId">Select Your Lost Report</label>
+        <label for="claimLostItemId">Select Your Active Lost Report</label>
         <select id="claimLostItemId" required>
           <option value="">Loading your lost reports...</option>
         </select>
@@ -49,19 +49,19 @@
           <option value="">Select your lost report first</option>
         </select>
 
-        <p id="claimMatchMessage" class="subtitle left-subtitle"></p>
+        <p id="claimMatchMessage" class="subtitle left-subtitle" style="font-weight: 600;"></p>
 
         <label for="claimItemName">Item Name</label>
         <input type="text" id="claimItemName" placeholder="Item Name" readonly />
 
         <textarea id="claimReason" placeholder="Why do you believe this item is yours?" required></textarea>
-        <textarea id="claimDescription" placeholder="Describe the item in detail" required></textarea>
-        <textarea id="claimUniqueMarks" placeholder="State unique identifying marks" required></textarea>
+        <textarea id="claimDescription" placeholder="Describe the item in complete detail" required></textarea>
+        <textarea id="claimUniqueMarks" placeholder="State unique identifying marks (passwords, scratches, serial numbers)" required></textarea>
         <textarea id="claimContents" placeholder="Mention contents/accessories if any" required></textarea>
         <input type="text" id="claimLostPlace" placeholder="Where did you lose it?" required />
         <input type="date" id="claimLostDate" required />
 
-        <button type="submit">Submit Claim</button>
+        <button type="submit">Submit Claim for Admin Verification</button>
       </form>
 
       <p id="message"></p>
@@ -69,10 +69,12 @@
 
     <div class="back-link-row">
       <a href="./dashboard.html">Back to Dashboard</a>
+      <a href="./my-reports.html">My Reports</a>
       <a href="./support.html">Support</a>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

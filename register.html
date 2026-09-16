@@ -22,8 +22,9 @@
       <div class="brand">Campus Lost &amp; Found</div>
       <div class="home-links">
         <a href="./index.html" class="nav-pill">Home</a>
+        <a href="./browse-items.html" class="nav-pill">Browse Items</a>
         <a href="./support.html" class="nav-pill">Support</a>
-        <a href="./login.html" class="nav-pill">Login</a>
+        <a href="./login.html" class="nav-pill nav-pill-primary">Login</a>
       </div>
     </div>
 
@@ -35,14 +36,17 @@
         <form id="registerForm">
           <input type="text" id="matricNo" placeholder="Matriculation Number" required />
           <input type="text" id="fullName" placeholder="Full Name" required />
-          <input type="text" id="phone" placeholder="Phone Number" required />
+          <input type="phone" id="phone" placeholder="Phone Number" required />
           <input type="email" id="email" placeholder="Email Address" required />
           <input type="text" id="faculty" placeholder="Faculty" required />
           <input type="text" id="department" placeholder="Department" required />
           <input type="text" id="level" placeholder="Level" required />
+          
+          <label for="passport">Upload Passport Photo (Optional)</label>
           <input type="file" id="passport" accept="image/*" />
           <img id="passportPreview" alt="Passport Preview" />
-          <input type="password" id="password" placeholder="Password" required />
+
+          <input type="password" id="password" placeholder="Password (Min. 6 characters)" required />
           <input type="password" id="confirmPassword" placeholder="Confirm Password" required />
 
           <button type="submit">Register</button>
@@ -56,19 +60,20 @@
         <span class="support-badge">Registration Tips</span>
         <h3>Before you submit</h3>
         <ul class="panel-list">
-          <li>Check that your email is correct.</li>
-          <li>Your passport image can be added now or later if needed.</li>
-          <li>Use a password you can remember easily.</li>
+          <li>Ensure your matriculation number and institutional email are accurate.</li>
+          <li>Passport photos can be uploaded now or updated later in Settings.</li>
+          <li>Passwords must contain at least 6 characters.</li>
         </ul>
 
         <div class="auth-links">
           <a href="./support.html" class="quick-link">Open Support</a>
-          <a href="./browse-items.html" class="quick-link">Browse Items</a>
+          <a href="./browse-items.html" class="quick-link">Browse Lost &amp; Found</a>
         </div>
       </div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

@@ -29,7 +29,6 @@
         <div id="profileDropdown" class="profile-dropdown">
           <a href="./admin.html">Admin Overview</a>
           <a href="./profile.html">Profile</a>
-          <a href="./my-reports.html">My Reports</a>
           <a href="./support.html">Support</a>
           <a href="./settings.html">Settings</a>
           <a href="#" id="logoutBtn">Logout</a>
@@ -42,42 +41,38 @@
         <h3>Lost Reports</h3>
         <span id="adminLostCount" class="dashboard-count">0 active</span>
         <span id="adminLostMeta" class="dashboard-meta">0 resolved</span>
-        <p>Review lost-item reports that still need attention.</p>
+        <p>Review and resolve lost-item reports.</p>
       </a>
 
       <a href="./admin-found.html" class="dashboard-card">
         <h3>Found Reports</h3>
         <span id="adminFoundCount" class="dashboard-count">0 active</span>
         <span id="adminFoundMeta" class="dashboard-meta">0 closed</span>
-        <p>Review found-item reports that still need action.</p>
+        <p>Review found-item reports and manage custody records.</p>
       </a>
 
       <a href="./admin-claims.html" class="dashboard-card">
-        <h3>Claims</h3>
+        <h3>Claims Verification</h3>
         <span id="adminClaimsCount" class="dashboard-count">0 pending</span>
         <span id="adminClaimsMeta" class="dashboard-meta">0 reviewed</span>
-        <p>Approve or reject claim requests that are still pending.</p>
+        <p>Approve or reject student ownership claims side-by-side.</p>
       </a>
 
       <a href="./admin-matches.html" class="dashboard-card">
         <h3>Possible Matches</h3>
         <span id="adminMatchesCount" class="dashboard-count">0 open</span>
         <span id="adminMatchesMeta" class="dashboard-meta">0 archived</span>
-        <p>Check suggested lost/found similarities.</p>
+        <p>Inspect algorithm-suggested lost/found pairs.</p>
       </a>
 
       <a href="./browse-items.html" class="dashboard-card">
-        <h3>Browse Public Items</h3>
-        <p>Open the public listings page.</p>
-      </a>
-
-      <a href="./support.html" class="dashboard-card">
-        <h3>Support</h3>
-        <p>Open the support center and help information.</p>
+        <h3>Public Active Directory</h3>
+        <p>Inspect the portal's public listing view.</p>
       </a>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

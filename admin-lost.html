@@ -20,7 +20,7 @@
   <div class="container">
     <div class="page-topbar">
       <div>
-        <h1 class="page-title-left">Lost Reports</h1>
+        <h1 class="page-title-left">Lost Reports Management</h1>
         <p id="welcomeUser" class="subtitle left-subtitle">Admin review page for lost-item reports.</p>
       </div>
 
@@ -36,12 +36,20 @@
       </div>
     </div>
 
-    <div class="items-box admin-section">
+    <div class="search-stack" style="margin-bottom: 14px;">
+      <select id="adminLostFilter" style="max-width: 220px;">
+        <option value="all">View: All Reports</option>
+        <option value="active" selected>View: Active Reports</option>
+        <option value="resolved">View: Resolved Reports</option>
+      </select>
+    </div>
+
+    <div class="items-box admin-section" id="adminLostActiveSection">
       <h2>Active Lost Reports</h2>
       <div id="adminLostItemsList"></div>
     </div>
 
-    <details class="items-box admin-section archived-section">
+    <details class="items-box admin-section archived-section" id="adminLostResolvedSection">
       <summary><h2>Resolved Lost Reports <span style="float: right;">▼</span></h2></summary>
       <div id="adminResolvedLostItemsList" style="margin-top: 15px;"></div>
     </details>
@@ -52,6 +60,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

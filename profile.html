@@ -18,45 +18,104 @@
 </head>
 <body>
   <div class="container">
-    <div class="page-topbar">
+    <div class="page-topbar profile-header-topbar">
       <div>
-        <h1 class="page-title-left">Profile</h1>
-        <p class="subtitle left-subtitle">Your account information.</p>
+        <h1 class="page-title-left">Profile Dashboard</h1>
+        <p class="subtitle left-subtitle">Overview of your institutional account details.</p>
       </div>
 
-      <div class="profile-menu-wrap">
-        <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
-        <div id="profileDropdown" class="profile-dropdown">
-          <a href="./dashboard.html">Dashboard</a>
-          <a href="./profile.html">Profile</a>
-          <a href="./my-reports.html">My Reports</a>
-          <a href="./support.html">Support</a>
-          <a href="./settings.html">Settings</a>
-          <a href="#" id="logoutBtn">Logout</a>
+      <div class="profile-actions-top">
+        <a href="./dashboard.html" class="nav-pill nav-pill-primary">Dashboard</a>
+        <div class="profile-menu-wrap">
+          <button type="button" id="profileMenuBtn" class="profile-menu-btn">☰ Profile</button>
+          <div id="profileDropdown" class="profile-dropdown">
+            <a href="./dashboard.html">Dashboard</a>
+            <a href="./profile.html">Profile</a>
+            <a href="./my-reports.html">My Reports</a>
+            <a href="./support.html">Support</a>
+            <a href="./settings.html">Settings</a>
+            <a href="#" id="logoutBtn">Logout</a>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="items-box">
-      <h3 id="profileName">User</h3>
-      <p><strong>Email:</strong> <span id="profileEmail">-</span></p>
-      <p><strong>Phone:</strong> <span id="profilePhone">-</span></p>
-      <p><strong>Faculty:</strong> <span id="profileFaculty">-</span></p>
-      <p><strong>Department:</strong> <span id="profileDepartment">-</span></p>
-      <p><strong>Level:</strong> <span id="profileLevel">-</span></p>
-      <p><strong>Role:</strong> <span id="profileRole">-</span></p>
-    </div>
+    <div class="profile-main-layout">
+      <aside class="profile-sidebar">
+        <div class="profile-card profile-identity-box">
+          <div class="profile-avatar-wrapper">
+            <img id="profilePassport" src="" alt="User Avatar" class="profile-avatar-img" />
+          </div>
+          <h2 id="profileName" class="profile-identity-name">User Name</h2>
+          <span id="profileMatric" class="profile-identity-sub">Matric No. Loading...</span>
+          <span id="profileRole" class="role-badge">Student</span>
+          <div class="section-divider" style="margin: 16px 0;"></div>
+          <p class="helper-note center-note">Need to update your details or password?</p>
+          <a href="./settings.html" class="quick-link full-link" style="text-align: center;">Manage Account Settings</a>
+        </div>
+      </aside>
+      
+      <section class="profile-info-display">
+        <div class="settings-panel info-display-panel">
+          <span class="theme-chip">Account Verified</span>
+          <h3>Personal &amp; Contact Details</h3>
+          
+          <div class="info-grid-compact">
+            <div class="info-item">
+              <span class="info-label">Email Address</span>
+              <span id="profileEmail" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Phone Number</span>
+              <span id="profilePhone" class="info-value">-</span>
+            </div>
+          </div>
+        </div>
 
-    <div class="quick-links">
-      <a href="./settings.html" class="quick-link">Edit Settings</a>
-      <a href="./support.html" class="quick-link">Need Help?</a>
-    </div>
+        <div class="settings-panel info-display-panel">
+          <span class="theme-chip Chip-Teal">University Record</span>
+          <h3>Academic Program</h3>
+          
+          <div class="info-grid-compact academic-grid">
+            <div class="info-item">
+              <span class="info-label">Faculty</span>
+              <span id="profileFaculty" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Department</span>
+              <span id="profileDepartment" class="info-value">-</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Current Level</span>
+              <span id="profileLevel" class="info-value">-</span>
+            </div>
+          </div>
+        </div>
 
-    <div class="back-link-row">
-      <a href="./dashboard.html">Back to Dashboard</a>
+        <div class="settings-panel info-display-panel no-margin-bottom">
+          <span class="theme-chip Chip-Amber">My Activity</span>
+          <h3>Quick Activity Access</h3>
+          
+          <div class="quick-links dashboard-card-links">
+            <a href="./my-reports.html" class="dashboard-card action-card">
+              <h3>My Reports</h3>
+              <p>View your submitted items and claims.</p>
+            </a>
+            <a href="./claim-item.html" class="dashboard-card action-card">
+              <h3>Submit Claim</h3>
+              <p>File an ownership verification request.</p>
+            </a>
+            <a href="./browse-items.html" class="dashboard-card action-card">
+              <h3>Browse Listings</h3>
+              <p>Search active campus lost and found posts.</p>
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

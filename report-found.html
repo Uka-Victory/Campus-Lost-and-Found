@@ -21,7 +21,7 @@
     <div class="page-topbar">
       <div>
         <h1 class="page-title-left">Report Found Item</h1>
-        <p id="welcomeUser" class="subtitle left-subtitle">Write accurate details and where the item was handed in.</p>
+        <p id="welcomeUser" class="subtitle left-subtitle">State accurate details and where the item was deposited.</p>
       </div>
 
       <div class="profile-menu-wrap">
@@ -39,8 +39,10 @@
 
     <div class="form-panel">
       <form id="foundItemForm">
-        <input type="text" id="foundItemName" placeholder="Item Name" required />
+        <label for="foundItemName">General Item Name</label>
+        <input type="text" id="foundItemName" placeholder="Item Name (e.g. Black Samsung Phone, Brown Wallet)" required />
 
+        <label for="foundCategory">Category</label>
         <select id="foundCategory" required>
           <option value="">Select Category</option>
           <option value="Electronics">Electronics</option>
@@ -52,18 +54,25 @@
           <option value="Others">Others</option>
         </select>
 
-        <textarea id="foundDescription" placeholder="Describe the found item" required></textarea>
+        <label for="foundDescription">General Description</label>
+        <textarea id="foundDescription" placeholder="General public description (do not expose private verification secrets)" required></textarea>
   
-        <textarea id="foundUniqueMarks" placeholder="Unique marks you noticed: color, stickers, scratches, engraving, contents, or other identifying details"></textarea>
+        <label for="foundUniqueMarks">Confidential Unique Marks (Admin / Matching Only)</label>
+        <textarea id="foundUniqueMarks" placeholder="Unique marks noticed: stickers, scratches, engravings, wallpaper, serial details"></textarea>
 
         <label for="dateFound">Date Found</label>
         <input type="date" id="dateFound" required />
 
-        <input type="text" id="locationFound" placeholder="Location Found" required />
-        <input type="text" id="handInLocation" placeholder="Where was it handed in?" required />
+        <label for="locationFound">Location Found</label>
+        <input type="text" id="locationFound" placeholder="Location Found (e.g. Faculty Hallway, Cafeteria)" required />
 
-        <textarea id="privateNote" placeholder="Private verification note (admin only)" required></textarea>
+        <label for="handInLocation">Custody / Hand-In Location</label>
+        <input type="text" id="handInLocation" placeholder="Where was it handed in? (e.g. Security Post A, Dean's Office)" required />
 
+        <label for="privateNote">Private Admin Verification Note</label>
+        <textarea id="privateNote" placeholder="Private verification note (Admin-only confidential check)" required></textarea>
+
+        <label for="foundImage">Upload Photo (Optional)</label>
         <input type="file" id="foundImage" accept="image/*" />
         <img id="foundImagePreview" alt="Found Item Preview" />
 
@@ -75,10 +84,12 @@
 
     <div class="back-link-row">
       <a href="./dashboard.html">Back to Dashboard</a>
+      <a href="./browse-items.html">Browse Listings</a>
       <a href="./support.html">Support</a>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

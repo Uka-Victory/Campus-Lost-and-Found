@@ -17,11 +17,11 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
+  <div class="container" style="max-width: 1200px;">
     <div class="page-topbar">
       <div>
-        <h1 class="page-title-left">Claims</h1>
-        <p id="welcomeUser" class="subtitle left-subtitle">Admin review page for item claims.</p>
+        <h1 class="page-title-left">Claims Verification</h1>
+        <p id="welcomeUser" class="subtitle left-subtitle">Compare claimant proof side-by-side with lost reports and confidential found logs.</p>
       </div>
 
       <div class="profile-menu-wrap">
@@ -37,12 +37,12 @@
     </div>
 
     <div class="items-box admin-section">
-      <h2>Pending Claims</h2>
+      <h2>Pending Claims Requiring Action</h2>
       <div id="adminClaimsList"></div>
     </div>
 
     <details class="items-box admin-section archived-section">
-      <summary><h2>Reviewed Claims <span style="float: right;">▼</span></h2></summary>
+      <summary><h2>Reviewed Claims (Approved / Rejected) <span style="float: right;">▼</span></h2></summary>
       <div id="adminReviewedClaimsList" style="margin-top: 15px;"></div>
     </details>
 
@@ -52,6 +52,7 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

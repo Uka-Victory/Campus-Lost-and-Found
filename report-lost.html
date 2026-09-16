@@ -21,7 +21,7 @@
     <div class="page-topbar">
       <div>
         <h1 class="page-title-left">Report Lost Item</h1>
-        <p id="welcomeUser" class="subtitle left-subtitle">Give clear details so matching can work better.</p>
+        <p id="welcomeUser" class="subtitle left-subtitle">Provide clear details so our matching system can find it.</p>
       </div>
 
       <div class="profile-menu-wrap">
@@ -39,8 +39,10 @@
 
     <div class="form-panel">
       <form id="lostItemForm">
-        <input type="text" id="itemName" placeholder="Item Name" required />
+        <label for="itemName">Item Name</label>
+        <input type="text" id="itemName" placeholder="Item Name (e.g. Blue HP Laptop, iPhone 13)" required />
 
+        <label for="category">Category</label>
         <select id="category" required>
           <option value="">Select Category</option>
           <option value="Electronics">Electronics</option>
@@ -52,15 +54,19 @@
           <option value="Others">Others</option>
         </select>
 
-        <textarea id="description" placeholder="Describe the lost item" required></textarea>
+        <label for="description">Detailed Description</label>
+        <textarea id="description" placeholder="Describe the lost item in detail" required></textarea>
 
+        <label for="lostUniqueMarks">Unique Identifying Marks</label>
         <textarea id="lostUniqueMarks" placeholder="Unique marks, colors, stickers, scratches, engraving, contents, or anything else that can help identify it"></textarea>
 
         <label for="dateLost">Date Lost</label>
         <input type="date" id="dateLost" required />
 
-        <input type="text" id="locationLost" placeholder="Location Lost" required />
+        <label for="locationLost">Location Lost</label>
+        <input type="text" id="locationLost" placeholder="Location Lost (e.g. Science Complex, Library 2nd Floor)" required />
 
+        <label for="lostImage">Upload Photo (Optional)</label>
         <input type="file" id="lostImage" accept="image/*" />
         <img id="lostImagePreview" alt="Lost Item Preview" />
 
@@ -72,10 +78,12 @@
 
     <div class="back-link-row">
       <a href="./dashboard.html">Back to Dashboard</a>
+      <a href="./browse-items.html">Browse Listings</a>
       <a href="./support.html">Support</a>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

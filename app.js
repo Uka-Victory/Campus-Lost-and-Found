@@ -52,6 +52,7 @@ const foundItemsList = document.getElementById("foundItemsList");
 const searchInput = document.getElementById("searchInput");
 const categoryFilter = document.getElementById("categoryFilter");
 const searchBtn = document.getElementById("searchBtn");
+
 const adminLostCount = document.getElementById("adminLostCount");
 const adminFoundCount = document.getElementById("adminFoundCount");
 const adminClaimsCount = document.getElementById("adminClaimsCount");
@@ -70,11 +71,20 @@ const adminClaimsList = document.getElementById("adminClaimsList");
 const adminReviewedClaimsList = document.getElementById("adminReviewedClaimsList");
 const adminMatchesList = document.getElementById("adminMatchesList");
 
+const adminLostFilter = document.getElementById("adminLostFilter");
+const adminFoundFilter = document.getElementById("adminFoundFilter");
+const adminLostActiveSection = document.getElementById("adminLostActiveSection");
+const adminLostResolvedSection = document.getElementById("adminLostResolvedSection");
+const adminFoundActiveSection = document.getElementById("adminFoundActiveSection");
+const adminFoundResolvedSection = document.getElementById("adminFoundResolvedSection");
+
 const myLostItemsList = document.getElementById("myLostItemsList");
 const myFoundItemsList = document.getElementById("myFoundItemsList");
 const myClaimsList = document.getElementById("myClaimsList");
 
 const notificationsList = document.getElementById("notificationsList");
+const notifBtn = document.getElementById("notifBtn");
+const notifDropdown = document.getElementById("notifDropdown");
 
 const profileMenuBtn = document.getElementById("profileMenuBtn");
 const profileDropdown = document.getElementById("profileDropdown");
@@ -94,7 +104,6 @@ const themeDarkBtn = document.getElementById("themeDarkBtn");
 const themeAutoBtn = document.getElementById("themeAutoBtn");
 const currentThemeLabel = document.getElementById("currentThemeLabel");
 
-/* IMAGE INPUTS + PREVIEWS */
 const passportInput = document.getElementById("passport");
 const lostImageInput = document.getElementById("lostImage");
 const foundImageInput = document.getElementById("foundImage");
@@ -106,11 +115,9 @@ const foundImagePreview = document.getElementById("foundImagePreview");
 /* HELPERS */
 async function uploadImage(file, folderName) {
   if (!file) return "";
-
   const fileRef = ref(storage, `${folderName}/${Date.now()}_${file.name}`);
   await uploadBytes(fileRef, file);
-  const downloadURL = await getDownloadURL(fileRef);
-  return downloadURL;
+  return await getDownloadURL(fileRef);
 }
 
 function showImagePreview(inputElement, previewElement) {
@@ -118,15 +125,12 @@ function showImagePreview(inputElement, previewElement) {
 
   inputElement.addEventListener("change", function () {
     const file = inputElement.files[0];
-
     if (file) {
       const reader = new FileReader();
-
       reader.onload = function (e) {
         previewElement.src = e.target.result;
         previewElement.style.display = "block";
       };
-
       reader.readAsDataURL(file);
     } else {
       previewElement.src = "";
@@ -141,14 +145,17 @@ function getStatusBadge(status) {
   return `<span class="status-badge status-${safeStatus}">${label}</span>`;
 }
 
-function showMsg(text) {
-  if (message) message.textContent = text;
+function showPopup(text, icon = "info") {
+  if (typeof Swal !== "undefined") {
+    Swal.fire({
+      text: text,
+      icon: icon,
+      confirmButtonColor: "#1e3a8a"
+    });
+  }
 }
 
-function showPopup(text) {
-  alert(text);
-}
-
+/* THEME SYSTEM */
 const THEME_STORAGE_KEY = "campusLostFoundTheme";
 const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -189,58 +196,30 @@ function saveThemeMode(mode) {
 }
 
 function setupThemeControls() {
-  if (themeLightBtn) {
-    themeLightBtn.addEventListener("click", function () {
-      saveThemeMode("light");
-    });
-  }
-
-  if (themeDarkBtn) {
-    themeDarkBtn.addEventListener("click", function () {
-      saveThemeMode("dark");
-    });
-  }
-
-  if (themeAutoBtn) {
-    themeAutoBtn.addEventListener("click", function () {
-      saveThemeMode("auto");
-    });
-  }
-
+  if (themeLightBtn) themeLightBtn.addEventListener("click", () => saveThemeMode("light"));
+  if (themeDarkBtn) themeDarkBtn.addEventListener("click", () => saveThemeMode("dark"));
+  if (themeAutoBtn) themeAutoBtn.addEventListener("click", () => saveThemeMode("auto"));
   updateThemeControls(getStoredThemeMode());
 }
 
 if (systemThemeQuery.addEventListener) {
-  systemThemeQuery.addEventListener("change", function () {
-    if (getStoredThemeMode() === "auto") {
-      applyTheme("auto");
-    }
-  });
-} else if (systemThemeQuery.addListener) {
-  systemThemeQuery.addListener(function () {
-    if (getStoredThemeMode() === "auto") {
-      applyTheme("auto");
-    }
+  systemThemeQuery.addEventListener("change", () => {
+    if (getStoredThemeMode() === "auto") applyTheme("auto");
   });
 }
+
+/* TEXT TOKENIZATION & MATCHING ENGINE */
+const STOP_WORDS = new Set(["the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "with", "is", "was", "it", "my", "of", "this", "that", "i", "lost", "found", "item", "please", "phone", "bag", "device"]);
 
 function normalizeText(value) {
   return (value || "").trim().toLowerCase();
-}
-
-function buildItemKey(itemName, category) {
-  return `${normalizeText(itemName)}||${normalizeText(category)}`;
-}
-
-function buildOwnerItemKey(userId, itemName, category) {
-  return `${userId || ""}||${buildItemKey(itemName, category)}`;
 }
 
 function tokenizeText(value) {
   return normalizeText(value)
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter((token) => token.length > 2);
+    .filter((token) => token.length > 2 && !STOP_WORDS.has(token));
 }
 
 function textSimilarity(a, b) {
@@ -260,74 +239,70 @@ function textSimilarity(a, b) {
 
 function dateClosenessScore(dateA, dateB) {
   if (!dateA || !dateB) return 0;
-
-  const first = new Date(dateA);
-  const second = new Date(dateB);
-  const diffMs = Math.abs(first.getTime() - second.getTime());
+  const diffMs = Math.abs(new Date(dateA).getTime() - new Date(dateB).getTime());
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
   if (diffDays <= 2) return 10;
   if (diffDays <= 7) return 7;
   if (diffDays <= 14) return 4;
-  if (diffDays <= 30) return 2;
   return 0;
 }
 
+/* STRICT SIMILARITY ALGORITHM */
 function calculatePossibleMatch(lostItem, foundItem) {
   let score = 0;
   const reasons = [];
 
-  if (
-    normalizeText(lostItem.category) &&
-    normalizeText(lostItem.category) === normalizeText(foundItem.category)
-  ) {
-    score += 25;
+  const lostCat = normalizeText(lostItem.category);
+  const foundCat = normalizeText(foundItem.category);
+
+  // 1. Mandatory Category Match (unless both categorize as "Others")
+  if (lostCat && foundCat && lostCat === foundCat) {
+    score += 35;
     reasons.push("same category");
-  }
-
-  const nameSimilarity = textSimilarity(lostItem.itemName, foundItem.itemName);
-  if (nameSimilarity >= 0.75) {
-    score += 25;
-    reasons.push("very similar item name");
-  } else if (nameSimilarity >= 0.4) {
-    score += 14;
-    reasons.push("similar item name");
-  }
-
-  const detailsSimilarity = textSimilarity(
-    `${lostItem.description || ""} ${lostItem.uniqueMarks || ""}`,
-    `${foundItem.description || ""} ${foundItem.uniqueMarks || ""} ${foundItem.privateNote || ""}`
-  );
-  if (detailsSimilarity >= 0.45) {
-    score += 25;
-    reasons.push("description/details overlap");
-  } else if (detailsSimilarity >= 0.2) {
-    score += 12;
-    reasons.push("some description overlap");
-  }
-
-  const uniqueMarksSimilarity = textSimilarity(lostItem.uniqueMarks, foundItem.uniqueMarks);
-  if (uniqueMarksSimilarity >= 0.35) {
+  } else if (lostCat === "others" && foundCat === "others") {
     score += 15;
-    reasons.push("unique marks overlap");
-  } else if (uniqueMarksSimilarity > 0) {
-    score += 8;
-    reasons.push("some unique marks overlap");
+    reasons.push("category: others");
+  } else {
+    // Immediate disqualification if categories disagree
+    return { score: 0, reasons: [] };
   }
 
-  const locationSimilarity = textSimilarity(lostItem.locationLost, foundItem.locationFound);
-  if (locationSimilarity >= 0.5) {
+  // 2. Name Similarity
+  const nameSim = textSimilarity(lostItem.itemName, foundItem.itemName);
+  if (nameSim >= 0.5) {
+    score += 35;
+    reasons.push("strong item title similarity");
+  } else if (nameSim >= 0.25) {
+    score += 20;
+    reasons.push("item title similarity");
+  }
+
+  // 3. Keyword / Description Overlap
+  const detailsSim = textSimilarity(
+    `${lostItem.description || ""} ${lostItem.uniqueMarks || ""}`,
+    `${foundItem.description || ""} ${foundItem.uniqueMarks || ""}`
+  );
+  if (detailsSim >= 0.3) {
+    score += 20;
+    reasons.push("description match");
+  } else if (detailsSim >= 0.12) {
     score += 10;
-    reasons.push("similar location");
-  } else if (locationSimilarity > 0) {
-    score += 5;
-    reasons.push("location overlap");
+    reasons.push("partial description match");
   }
 
+  // 4. Location Proximity
+  const locSim = textSimilarity(lostItem.locationLost, foundItem.locationFound);
+  if (locSim >= 0.3) {
+    score += 10;
+    reasons.push("matching campus area");
+  }
+
+  // 5. Date Proximity
   const dateScore = dateClosenessScore(lostItem.dateLost, foundItem.dateFound);
   if (dateScore > 0) {
     score += dateScore;
-    reasons.push("dates are reasonably close");
+    reasons.push("reported close in date");
   }
 
   return { score, reasons };
@@ -336,20 +311,17 @@ function calculatePossibleMatch(lostItem, foundItem) {
 async function hasExistingMatchSuggestion(lostItemId, foundItemId) {
   const snapshot = await getDocs(collection(db, "matchSuggestions"));
   let exists = false;
-
   snapshot.forEach((docItem) => {
     const data = docItem.data();
     if (data.lostItemId === lostItemId && data.foundItemId === foundItemId) {
       exists = true;
     }
   });
-
   return exists;
 }
 
 async function createNotification(userId, title, text, type = "info", extraData = {}) {
   if (!userId) return;
-
   try {
     await addDoc(collection(db, "notifications"), {
       userId,
@@ -360,7 +332,7 @@ async function createNotification(userId, title, text, type = "info", extraData 
       ...extraData
     });
   } catch (error) {
-    console.log(error);
+    console.log("Notification error:", error);
   }
 }
 
@@ -384,8 +356,8 @@ async function createPossibleMatchSuggestion(lostItemId, lostItem, foundItemId, 
 
   await createNotification(
     lostItem.userId,
-    "Possible match found",
-    `A found item report similar to "${lostItem.itemName}" was submitted. Review it and verify if it may be yours.`,
+    "Potential Match Found",
+    `A found report matching "${lostItem.itemName}" was posted (${matchData.score}% match). Click to inspect and file a claim.`,
     "info",
     {
       notificationKind: "possible_match",
@@ -398,17 +370,13 @@ async function createPossibleMatchSuggestion(lostItemId, lostItem, foundItemId, 
 
 async function checkPossibleMatchesForFoundItem(foundItemId, foundItem) {
   const snapshot = await getDocs(collection(db, "lostItems"));
-
   for (const docItem of snapshot.docs) {
     const lostItem = docItem.data();
-    const lostStatus = normalizeText(lostItem.status);
-
-    if (lostStatus === "resolved") continue;
+    if (normalizeText(lostItem.status) === "resolved") continue;
     if (lostItem.userId === foundItem.userId) continue;
 
     const matchData = calculatePossibleMatch(lostItem, foundItem);
-
-    if (matchData.score >= 45) {
+    if (matchData.score >= 50) {
       await createPossibleMatchSuggestion(docItem.id, lostItem, foundItemId, foundItem, matchData);
     }
   }
@@ -416,25 +384,22 @@ async function checkPossibleMatchesForFoundItem(foundItemId, foundItem) {
 
 async function checkPossibleMatchesForLostItem(lostItemId, lostItem) {
   const snapshot = await getDocs(collection(db, "foundItems"));
-
   for (const docItem of snapshot.docs) {
     const foundItem = docItem.data();
     const foundStatus = normalizeText(foundItem.status);
-
     if (foundStatus === "claimed" || foundStatus === "resolved") continue;
     if (foundItem.userId === lostItem.userId) continue;
 
     const matchData = calculatePossibleMatch(lostItem, foundItem);
-
-    if (matchData.score >= 45) {
+    if (matchData.score >= 50) {
       await createPossibleMatchSuggestion(lostItemId, lostItem, docItem.id, foundItem, matchData);
     }
   }
 }
 
+/* CLAIMS DROPDOWN LINKING */
 function syncClaimItemName() {
   if (!claimFoundItemSelect || !claimItemNameInput) return;
-
   const selectedOption = claimFoundItemSelect.options[claimFoundItemSelect.selectedIndex];
   claimItemNameInput.value = selectedOption?.dataset?.itemName || "";
 }
@@ -443,77 +408,61 @@ function resetClaimFoundItems() {
   if (claimFoundItemSelect) {
     claimFoundItemSelect.innerHTML = `<option value="">Select your lost report first</option>`;
   }
-
-  if (claimItemNameInput) {
-    claimItemNameInput.value = "";
-  }
-
-  if (claimMatchMessage) {
-    claimMatchMessage.textContent = "";
-  }
+  if (claimItemNameInput) claimItemNameInput.value = "";
+  if (claimMatchMessage) claimMatchMessage.textContent = "";
 }
 
 async function loadUserLostReports(userId) {
   if (!claimLostItemSelect) return;
-
-  claimLostItemSelect.innerHTML = `<option value="">Loading your lost reports...</option>`;
+  claimLostItemSelect.innerHTML = `<option value="">Loading your active lost reports...</option>`;
 
   try {
     const snapshot = await getDocs(collection(db, "lostItems"));
-
     claimLostItemSelect.innerHTML = `<option value="">Select your lost report</option>`;
-
     let count = 0;
 
     snapshot.forEach((docItem) => {
       const item = docItem.data();
-      const currentStatus = normalizeText(item.status);
-
-      if (item.userId !== userId) return;
-      if (currentStatus === "resolved") return;
+      if (item.userId !== userId || normalizeText(item.status) === "resolved") return;
 
       const option = document.createElement("option");
       option.value = docItem.id;
       option.dataset.itemName = item.itemName || "";
       option.dataset.category = item.category || "";
-      option.textContent = `${item.itemName} • ${item.category} • ${item.dateLost || "No date"}`;
+      option.textContent = `${item.itemName} (${item.category}) - Lost on ${item.dateLost || "N/A"}`;
       claimLostItemSelect.appendChild(option);
       count += 1;
     });
 
     if (count === 0) {
-      claimLostItemSelect.innerHTML = `<option value="">You have no open lost reports</option>`;
+      claimLostItemSelect.innerHTML = `<option value="">You have no active lost reports</option>`;
     }
-
     resetClaimFoundItems();
   } catch (error) {
     console.log(error);
-    claimLostItemSelect.innerHTML = `<option value="">Failed to load your lost reports</option>`;
+    claimLostItemSelect.innerHTML = `<option value="">Failed to load reports</option>`;
     resetClaimFoundItems();
   }
 }
 
 async function loadMatchedFoundItemsForLostReport(lostItemId, userId) {
   if (!claimFoundItemSelect) return;
-
   if (!lostItemId) {
     resetClaimFoundItems();
     return;
   }
 
-  claimFoundItemSelect.innerHTML = `<option value="">Loading matching found reports...</option>`;
+  claimFoundItemSelect.innerHTML = `<option value="">Searching matching found reports...</option>`;
 
   try {
     const lostRef = doc(db, "lostItems", lostItemId);
     const lostSnap = await getDoc(lostRef);
-
     if (!lostSnap.exists()) {
       resetClaimFoundItems();
       return;
     }
 
     const lostItem = lostSnap.data();
-
     if (lostItem.userId !== userId) {
       resetClaimFoundItems();
       return;
@@ -525,250 +474,64 @@ async function loadMatchedFoundItemsForLostReport(lostItemId, userId) {
     foundSnapshot.forEach((docItem) => {
       const foundItem = docItem.data();
       const foundStatus = normalizeText(foundItem.status);
-
       if (foundStatus === "claimed" || foundStatus === "resolved") return;
       if (foundItem.userId === userId) return;
 
       const matchData = calculatePossibleMatch(lostItem, foundItem);
-
-      if (matchData.score >= 45) {
+      if (matchData.score >= 50) {
         matches.push({
           id: docItem.id,
           data: foundItem,
-          score: matchData.score,
-          reasons: matchData.reasons
+          score: matchData.score
         });
       }
     });
 
     matches.sort((a, b) => b.score - a.score);
 
-    claimFoundItemSelect.innerHTML = `<option value="">Select a matching found-item report</option>`;
-
     if (matches.length === 0) {
-      claimFoundItemSelect.innerHTML = `<option value="">No matching found reports available</option>`;
+      claimFoundItemSelect.innerHTML = `<option value="">No matching found items available</option>`;
       if (claimMatchMessage) {
-        claimMatchMessage.textContent = "No matching found reports were found for this lost report yet.";
+        claimMatchMessage.textContent = "No verified matching found items found. Try updating your lost report description.";
       }
       syncClaimItemName();
       return;
     }
 
+    claimFoundItemSelect.innerHTML = `<option value="">Select a matched found report</option>`;
     matches.forEach((match) => {
       const option = document.createElement("option");
       option.value = match.id;
       option.dataset.itemName = match.data.itemName || "";
       option.dataset.category = match.data.category || "";
-      option.dataset.score = String(match.score);
-      option.textContent = `${match.data.itemName} • ${match.data.category} • score ${match.score}`;
+      option.textContent = `${match.data.itemName} • ${match.data.category} • Match Score: ${match.score}%`;
       claimFoundItemSelect.appendChild(option);
     });
 
     if (claimMatchMessage) {
-      claimMatchMessage.textContent = `${matches.length} matching found report(s) available for this lost report.`;
+      claimMatchMessage.textContent = `${matches.length} matching found item(s) available for claim.`;
     }
-
     syncClaimItemName();
   } catch (error) {
     console.log(error);
-    claimFoundItemSelect.innerHTML = `<option value="">Failed to load matching found reports</option>`;
-    if (claimMatchMessage) {
-      claimMatchMessage.textContent = "";
-    }
+    claimFoundItemSelect.innerHTML = `<option value="">Error evaluating reports</option>`;
   }
 }
 
-if (claimFoundItemSelect) {
-  claimFoundItemSelect.addEventListener("change", syncClaimItemName);
-}
-
+if (claimFoundItemSelect) claimFoundItemSelect.addEventListener("change", syncClaimItemName);
 if (claimLostItemSelect) {
-  claimLostItemSelect.addEventListener("change", async function () {
+  claimLostItemSelect.addEventListener("change", async () => {
     const user = auth.currentUser;
-    if (!user) return;
-    await loadMatchedFoundItemsForLostReport(claimLostItemSelect.value, user.uid);
+    if (user) await loadMatchedFoundItemsForLostReport(claimLostItemSelect.value, user.uid);
   });
 }
 
-function setupProfileMenu() {
-  if (!profileMenuBtn || !profileDropdown) return;
-
-  profileMenuBtn.addEventListener("click", function (e) {
-    e.stopPropagation();
-    profileDropdown.classList.toggle("show");
-  });
-
-  document.addEventListener("click", function (e) {
-    if (!profileDropdown.contains(e.target) && e.target !== profileMenuBtn) {
-      profileDropdown.classList.remove("show");
-    }
-  });
-}
-
-function setupImageModal() {
-  let modal = document.getElementById("imageModal");
-
-  if (!modal) {
-    modal = document.createElement("div");
-    modal.id = "imageModal";
-    modal.className = "image-modal";
-    modal.innerHTML = `
-      <button class="image-modal-close" id="imageModalClose">Close</button>
-      <img id="imageModalImg" alt="Preview" />
-    `;
-    document.body.appendChild(modal);
-
-    modal.addEventListener("click", function (e) {
-      if (e.target === modal || e.target.id === "imageModalClose") {
-        modal.style.display = "none";
-      }
-    });
-  }
-
-  const modalImg = document.getElementById("imageModalImg");
-
-  document.querySelectorAll(".item-thumb").forEach((img) => {
-    img.onclick = function () {
-      modalImg.src = img.src;
-      modal.style.display = "flex";
-    };
-  });
-}
-
-async function loadAdminOverview() {
-  if (
-    !adminLostCount &&
-    !adminFoundCount &&
-    !adminClaimsCount &&
-    !adminMatchesCount &&
-    !adminLostMeta &&
-    !adminFoundMeta &&
-    !adminClaimsMeta &&
-    !adminMatchesMeta
-  ) return;
-
-  try {
-    const [lostSnapshot, foundSnapshot, claimsSnapshot, matchesSnapshot] = await Promise.all([
-      getDocs(collection(db, "lostItems")),
-      getDocs(collection(db, "foundItems")),
-      getDocs(collection(db, "claims")),
-      getDocs(collection(db, "matchSuggestions"))
-    ]);
-
-    let activeLost = 0;
-    let resolvedLost = 0;
-    lostSnapshot.forEach((docItem) => {
-      const status = normalizeText(docItem.data().status);
-      if (status === "resolved") {
-        resolvedLost += 1;
-      } else {
-        activeLost += 1;
-      }
-    });
-
-    let activeFound = 0;
-    let closedFound = 0;
-    foundSnapshot.forEach((docItem) => {
-      const status = normalizeText(docItem.data().status);
-      if (status === "claimed" || status === "resolved") {
-        closedFound += 1;
-      } else {
-        activeFound += 1;
-      }
-    });
-
-    let pendingClaims = 0;
-    let reviewedClaims = 0;
-    claimsSnapshot.forEach((docItem) => {
-      const item = docItem.data();
-      const status = normalizeText(item.claimStatus);
-      const hasLinkedFoundItem = !!item.foundItemId;
-
-      if (status === "pending" && hasLinkedFoundItem) {
-        pendingClaims += 1;
-      } else {
-        reviewedClaims += 1;
-      }
-    });
-
-    let openMatches = 0;
-    let archivedMatches = 0;
-    matchesSnapshot.forEach((docItem) => {
-      const status = normalizeText(docItem.data().status);
-      if (!status || status === "suggested" || status === "open" || status === "pending") {
-        openMatches += 1;
-      } else {
-        archivedMatches += 1;
-      }
-    });
-
-    if (adminLostCount) adminLostCount.textContent = `${activeLost} active`;
-    if (adminFoundCount) adminFoundCount.textContent = `${activeFound} active`;
-    if (adminClaimsCount) adminClaimsCount.textContent = `${pendingClaims} pending`;
-    if (adminMatchesCount) adminMatchesCount.textContent = `${openMatches} open`;
-
-    if (adminLostMeta) adminLostMeta.textContent = `${resolvedLost} resolved`;
-    if (adminFoundMeta) adminFoundMeta.textContent = `${closedFound} closed`;
-    if (adminClaimsMeta) adminClaimsMeta.textContent = `${reviewedClaims} reviewed`;
-    if (adminMatchesMeta) adminMatchesMeta.textContent = `${archivedMatches} archived`;
-  } catch (error) {
-    console.log(error);
-  }
-}
-
-async function refreshVisiblePages() {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  if (lostItemsList && foundItemsList) {
-    await loadItems();
-  }
-
-  if (adminLostCount || adminFoundCount || adminClaimsCount || adminMatchesCount) {
-    await loadAdminOverview();
-  }
-
-  if (
-    adminLostItemsList ||
-    adminResolvedLostItemsList ||
-    adminFoundItemsList ||
-    adminResolvedFoundItemsList ||
-    adminClaimsList ||
-    adminReviewedClaimsList ||
-    adminMatchesList
-  ) {
-    await loadAdminData();
-  }
-
-  if (myLostItemsList && myFoundItemsList && myClaimsList) {
-    await loadMyReports(user.uid);
-  }
-
-  if (notificationsList) {
-    await loadNotifications(user.uid);
-  }
-}
-
-applyTheme(getStoredThemeMode());
-showImagePreview(passportInput, passportPreview);
-showImagePreview(lostImageInput, lostImagePreview);
-showImagePreview(foundImageInput, foundImagePreview);
-showImagePreview(settingsPassportInput, settingsPassportPreview);
-setupProfileMenu();
-setupThemeControls();
-
-/* REGISTER FORM WITH ATOMIC AUTH & DATABASE CLEANUP */
+/* AUTHENTICATION */
 if (registerForm) {
   registerForm.addEventListener("submit", async function (e) {
     e.preventDefault();
+    const submitBtn = registerForm.querySelector('button[type="submit"]');
 
-    const submitBtn =
-      registerForm.querySelector('button[type="submit"]') ||
-      registerForm.querySelector("button");
-
-    if (submitBtn?.disabled) return;
-
-    // 1. FRONT-END VALIDATION (Prevents calling auth if fields are missing/invalid)
     const matricNo = document.getElementById("matricNo").value.trim();
     const fullName = document.getElementById("fullName").value.trim();
     const phone = document.getElementById("phone").value.trim();
@@ -781,37 +544,30 @@ if (registerForm) {
     const passportFile = document.getElementById("passport")?.files[0] || null;
 
     if (!matricNo || !fullName || !phone || !email || !faculty || !department || !level || !password || !confirmPassword) {
-      showMsg("Please fill in all required fields.");
-      showPopup("Please fill in all required fields.");
+      showPopup("Please fill in all required fields.", "warning");
       return;
     }
 
     if (password.length < 6) {
-      showMsg("Password must be at least 6 characters long.");
-      showPopup("Password must be at least 6 characters long.");
+      showPopup("Password must be at least 6 characters long.", "warning");
       return;
     }
 
     if (password !== confirmPassword) {
-      showMsg("Passwords do not match.");
-      showPopup("Passwords do not match.");
+      showPopup("Passwords do not match.", "warning");
       return;
     }
 
-    showMsg("Registering...");
     if (submitBtn) {
       submitBtn.disabled = true;
       submitBtn.textContent = "Registering...";
     }
 
     let createdUser = null;
-
     try {
-      // 2. CREATE USER IN AUTHENTICATION
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       createdUser = userCredential.user;
 
-      // 3. IMMEDIATELY CREATE USER DOCUMENT IN FIRESTORE DATABASE
       await setDoc(doc(db, "users", createdUser.uid), {
         matricNo,
         fullName,
@@ -825,55 +581,24 @@ if (registerForm) {
         createdAt: new Date().toISOString()
       });
 
-      // 4. OPTIONAL PASSPORT UPLOAD (Fails silently without corrupting account)
       if (passportFile) {
         try {
           const passportUrl = await uploadImage(passportFile, "passports");
           if (passportUrl) {
             await updateDoc(doc(db, "users", createdUser.uid), { passportUrl });
           }
-        } catch (passportError) {
-          console.log("Passport upload skipped/failed:", passportError);
+        } catch (err) {
+          console.log("Passport upload error:", err);
         }
       }
 
-      showMsg("Registration successful.");
-      showPopup("User registered successfully.");
+      showPopup("Registration successful! Redirecting to login...", "success");
       registerForm.reset();
-
-      if (passportPreview) {
-        passportPreview.src = "";
-        passportPreview.style.display = "none";
-      }
-
+      setTimeout(() => { window.location.href = "./login.html"; }, 1500);
     } catch (error) {
-      console.log("Registration error:", error);
-
-      // GUARANTEED CLEANUP: If Firestore doc failed, wipe the Auth user!
-      if (createdUser) {
-        try {
-          await deleteUser(createdUser);
-          console.log("Orphan auth user successfully cleaned up.");
-        } catch (cleanupError) {
-          console.log("Cleanup error:", cleanupError);
-        }
-      }
-
-      let friendlyMessage = "Registration failed.";
-
-      if (error.code === "auth/email-already-in-use") {
-        friendlyMessage = "This email is already registered. Please log in.";
-      } else if (error.code === "auth/invalid-email") {
-        friendlyMessage = "Please enter a valid email address.";
-      } else if (error.code === "auth/weak-password") {
-        friendlyMessage = "Password is too weak. Please use at least 6 characters.";
-      } else if (error.message) {
-        friendlyMessage = error.message;
-      }
-
-      showMsg(friendlyMessage);
-      showPopup(friendlyMessage);
-
+      console.log(error);
+      if (createdUser) await deleteUser(createdUser).catch(() => {});
+      showPopup(error.message || "Registration failed.", "error");
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
@@ -883,48 +608,9 @@ if (registerForm) {
   });
 }
 
-/* LOGIN + FORGOT PASSWORD */
-if (forgotPasswordLink) {
-  forgotPasswordLink.addEventListener("click", async function (e) {
-    e.preventDefault();
-
-    const email = document.getElementById("loginEmail")?.value.trim();
-
-    if (!email) {
-      showMsg("Enter your email address first.");
-      showPopup("Enter your email address first.");
-      return;
-    }
-
-    try {
-      await sendPasswordResetEmail(auth, email);
-      showMsg("Password reset email sent.");
-      showPopup("Password reset email sent. Check your email inbox.");
-    } catch (error) {
-      console.log(error);
-
-      let friendlyMessage = "Failed to send password reset email.";
-
-      if (error.code === "auth/invalid-email") {
-        friendlyMessage = "Please enter a valid email address.";
-      } else if (error.code === "auth/user-not-found") {
-        friendlyMessage = "No account was found with that email address.";
-      } else if (error.message) {
-        friendlyMessage = error.message;
-      }
-
-      showMsg(friendlyMessage);
-      showPopup(friendlyMessage);
-    }
-  });
-}
-
 if (loginForm) {
   loginForm.addEventListener("submit", async function (e) {
     e.preventDefault();
-
-    showMsg("Logging in...");
-
     const email = document.getElementById("loginEmail").value.trim();
     const password = document.getElementById("loginPassword").value;
 
@@ -932,58 +618,59 @@ if (loginForm) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-
+      const userSnap = await getDoc(doc(db, "users", user.uid));
       if (!userSnap.exists()) {
-        showMsg("Your account exists in Authentication, but your profile is missing from the database. Contact admin or register again after the orphan account is removed.");
+        showPopup("Profile data missing in database.", "error");
         await signOut(auth);
         return;
       }
 
-      const userData = userSnap.data();
-      const role = userData.role || "student";
-      const normalizedRole = (role || "").trim().toLowerCase();
-
-      showMsg("Login successful.");
-
-      if (normalizedRole === "admin") {
-        window.location.href = "./admin.html";
-      } else {
-        window.location.href = "./dashboard.html";
-      }
+      const role = (userSnap.data().role || "").toLowerCase();
+      window.location.href = role === "admin" ? "./admin.html" : "./dashboard.html";
     } catch (error) {
-      showMsg(error.message);
-      console.log(error);
+      showPopup(error.message || "Login failed.", "error");
     }
   });
 }
 
-/* LOGOUT */
-if (logoutBtn) {
-  logoutBtn.addEventListener("click", async function (e) {
+if (forgotPasswordLink) {
+  forgotPasswordLink.addEventListener("click", async (e) => {
     e.preventDefault();
-
+    let email = document.getElementById("loginEmail")?.value.trim();
+    if (!email) {
+      const { value: inputEmail } = await Swal.fire({
+        title: "Reset Password",
+        input: "email",
+        inputLabel: "Enter your registered email address:",
+        confirmButtonColor: "#1e3a8a",
+        showCancelButton: true
+      });
+      if (!inputEmail) return;
+      email = inputEmail.trim();
+    }
     try {
-      await signOut(auth);
-      window.location.href = "./index.html";
-    } catch (error) {
-      console.log(error);
-      alert("Logout failed.");
+      await sendPasswordResetEmail(auth, email);
+      showPopup("Password reset email sent. Please check your inbox.", "success");
+    } catch (err) {
+      showPopup(err.message, "error");
     }
   });
 }
 
-/* SETTINGS */
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await signOut(auth);
+    window.location.href = "./index.html";
+  });
+}
+
+/* SETTINGS & PROFILE */
 async function loadSettings(user) {
   if (!settingsForm) return;
-
   try {
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-
+    const userSnap = await getDoc(doc(db, "users", user.uid));
     if (!userSnap.exists()) return;
-
     const data = userSnap.data();
 
     document.getElementById("settingsFullName").value = data.fullName || "";
@@ -999,16 +686,12 @@ async function loadSettings(user) {
 
 async function loadProfile(user) {
   if (!profileName) return;
-
   try {
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-
+    const userSnap = await getDoc(doc(db, "users", user.uid));
     if (!userSnap.exists()) return;
-
     const data = userSnap.data();
 
-    profileName.textContent = data.fullName || "User";
+    profileName.textContent = data.fullName || "Student";
     if (profileEmail) profileEmail.textContent = data.email || user.email || "-";
     if (profileMatric) profileMatric.textContent = data.matricNo || "-";
     if (profilePhone) profilePhone.textContent = data.phone || "-";
@@ -1016,9 +699,7 @@ async function loadProfile(user) {
     if (profileDepartment) profileDepartment.textContent = data.department || "-";
     if (profileLevel) profileLevel.textContent = data.level || "-";
     if (profileRole) profileRole.textContent = data.role || "student";
-    if (profilePassport && data.passportUrl) {
-      profilePassport.src = data.passportUrl;
-    }
+    if (profilePassport && data.passportUrl) profilePassport.src = data.passportUrl;
   } catch (error) {
     console.log(error);
   }
@@ -1027,14 +708,8 @@ async function loadProfile(user) {
 if (settingsForm) {
   settingsForm.addEventListener("submit", async function (e) {
     e.preventDefault();
-
     const user = auth.currentUser;
-    if (!user) {
-      showMsg("Please log in first.");
-      return;
-    }
-
-    showMsg("Saving changes...");
+    if (!user) return;
 
     const fullName = document.getElementById("settingsFullName").value.trim();
     const phone = document.getElementById("settingsPhone").value.trim();
@@ -1048,17 +723,16 @@ if (settingsForm) {
     const settingsPassportFile = settingsPassportInput?.files[0] || null;
 
     try {
-      const userRef = doc(db, "users", user.uid);
       const emailChanged = user.email !== email;
       const wantsPasswordChange = newPassword.trim() !== "";
 
       if (wantsPasswordChange && newPassword !== confirmNewPassword) {
-        showMsg("New passwords do not match.");
+        showPopup("New passwords do not match.", "warning");
         return;
       }
 
       if ((emailChanged || wantsPasswordChange) && !currentPassword) {
-        showMsg("Enter your current password to change email or password.");
+        showPopup("Current password is required to change email or password.", "warning");
         return;
       }
 
@@ -1067,70 +741,34 @@ if (settingsForm) {
         await reauthenticateWithCredential(user, credential);
       }
 
-      if (emailChanged) {
-        await updateEmail(user, email);
-      }
+      if (emailChanged) await updateEmail(user, email);
+      if (wantsPasswordChange) await updatePassword(user, newPassword);
 
-      if (wantsPasswordChange) {
-        await updatePassword(user, newPassword);
-      }
-
-      await updateDoc(userRef, {
-        fullName,
-        phone,
-        email,
-        faculty,
-        department,
-        level
-      });
-
-      let settingsMessage = "Settings updated successfully.";
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, { fullName, phone, email, faculty, department, level });
 
       if (settingsPassportFile) {
-        try {
-          const passportUrl = await uploadImage(settingsPassportFile, "passports");
-          if (passportUrl) {
-            await updateDoc(userRef, { passportUrl });
-          }
-        } catch (passportError) {
-          console.log("Settings passport upload failed:", passportError);
-          settingsMessage = "Settings updated successfully, but passport upload failed. You can update it later.";
-        }
+        const passportUrl = await uploadImage(settingsPassportFile, "passports");
+        if (passportUrl) await updateDoc(userRef, { passportUrl });
       }
 
-      showMsg(settingsMessage);
-      showPopup(settingsMessage);
-
+      showPopup("Settings updated successfully.", "success");
       document.getElementById("currentPassword").value = "";
       document.getElementById("newPassword").value = "";
       document.getElementById("confirmNewPassword").value = "";
-      if (settingsPassportInput) settingsPassportInput.value = "";
-
-      if (settingsPassportPreview) {
-        settingsPassportPreview.src = "";
-        settingsPassportPreview.style.display = "none";
-      }
-
       await loadSettings(user);
     } catch (error) {
-      showMsg(error.message);
-      console.log(error);
+      showPopup(error.message || "Failed to update settings.", "error");
     }
   });
 }
 
-/* LOST ITEM */
+/* REPORT LOST */
 if (lostItemForm) {
   lostItemForm.addEventListener("submit", async function (e) {
     e.preventDefault();
-
-    showMsg("Submitting lost item report...");
-
     const user = auth.currentUser;
-    if (!user) {
-      showMsg("Please log in first.");
-      return;
-    }
+    if (!user) return;
 
     const itemName = document.getElementById("itemName").value.trim();
     const category = document.getElementById("category").value;
@@ -1141,19 +779,10 @@ if (lostItemForm) {
     const lostImageFile = document.getElementById("lostImage")?.files[0] || null;
 
     try {
-      let lostImageUrl = "";
-      let lostSubmitMessage = "Lost item report submitted successfully.";
+      let imageUrl = "";
+      if (lostImageFile) imageUrl = await uploadImage(lostImageFile, "lost-items");
 
-      if (lostImageFile) {
-        try {
-          lostImageUrl = await uploadImage(lostImageFile, "lost-items");
-        } catch (imageError) {
-          console.log("Lost item image upload failed:", imageError);
-          lostSubmitMessage = "Lost item report submitted successfully, but image upload failed.";
-        }
-      }
-
-      const newLostRef = await addDoc(collection(db, "lostItems"), {
+      const itemData = {
         userId: user.uid,
         itemName,
         category,
@@ -1161,55 +790,34 @@ if (lostItemForm) {
         uniqueMarks,
         dateLost,
         locationLost,
-        imageUrl: lostImageUrl,
+        imageUrl,
         status: "open",
         createdAt: new Date().toISOString()
-      });
+      };
 
-      await checkPossibleMatchesForLostItem(newLostRef.id, {
-        userId: user.uid,
-        itemName,
-        category,
-        description,
-        uniqueMarks,
-        dateLost,
-        locationLost,
-        imageUrl: lostImageUrl,
-        status: "open"
-      });
+      const newLostRef = await addDoc(collection(db, "lostItems"), itemData);
+      await checkPossibleMatchesForLostItem(newLostRef.id, itemData);
 
-      showMsg(lostSubmitMessage);
-      showPopup(lostSubmitMessage);
+      showPopup("Lost item report submitted successfully.", "success");
       lostItemForm.reset();
-
-      if (lostImagePreview) {
-        lostImagePreview.src = "";
-        lostImagePreview.style.display = "none";
-      }
-    } catch (error) {
-      showMsg(error.message);
-      console.log(error);
+      if (lostImagePreview) lostImagePreview.style.display = "none";
+    } catch (err) {
+      showPopup(err.message || "Error submitting report.", "error");
     }
   });
 }
 
-/* FOUND ITEM */
+/* REPORT FOUND */
 if (foundItemForm) {
   foundItemForm.addEventListener("submit", async function (e) {
     e.preventDefault();
-
-    showMsg("Submitting found item report...");
-
     const user = auth.currentUser;
-    if (!user) {
-      showMsg("Please log in first.");
-      return;
-    }
+    if (!user) return;
 
-    const foundItemName = document.getElementById("foundItemName").value.trim();
-    const foundCategory = document.getElementById("foundCategory").value;
-    const foundDescription = document.getElementById("foundDescription").value.trim();
-    const foundUniqueMarks = document.getElementById("foundUniqueMarks").value.trim();
+    const itemName = document.getElementById("foundItemName").value.trim();
+    const category = document.getElementById("foundCategory").value;
+    const description = document.getElementById("foundDescription").value.trim();
+    const uniqueMarks = document.getElementById("foundUniqueMarks").value.trim();
     const dateFound = document.getElementById("dateFound").value;
     const locationFound = document.getElementById("locationFound").value.trim();
     const handInLocation = document.getElementById("handInLocation").value.trim();
@@ -1217,73 +825,42 @@ if (foundItemForm) {
     const foundImageFile = document.getElementById("foundImage")?.files[0] || null;
 
     try {
-      let foundImageUrl = "";
-      let foundSubmitMessage = "Found item report submitted successfully.";
+      let imageUrl = "";
+      if (foundImageFile) imageUrl = await uploadImage(foundImageFile, "found-items");
 
-      if (foundImageFile) {
-        try {
-          foundImageUrl = await uploadImage(foundImageFile, "found-items");
-        } catch (imageError) {
-          console.log("Found item image upload failed:", imageError);
-          foundSubmitMessage = "Found item report submitted successfully, but image upload failed.";
-        }
-      }
-
-      const newFoundRef = await addDoc(collection(db, "foundItems"), {
+      const itemData = {
         userId: user.uid,
-        itemName: foundItemName,
-        category: foundCategory,
-        description: foundDescription,
-        uniqueMarks: foundUniqueMarks,
+        itemName,
+        category,
+        description,
+        uniqueMarks,
         dateFound,
         locationFound,
         handInLocation,
         privateNote,
-        imageUrl: foundImageUrl,
+        imageUrl,
         status: "open",
         createdAt: new Date().toISOString()
-      });
+      };
 
-      await checkPossibleMatchesForFoundItem(newFoundRef.id, {
-        userId: user.uid,
-        itemName: foundItemName,
-        category: foundCategory,
-        description: foundDescription,
-        uniqueMarks: foundUniqueMarks,
-        dateFound,
-        locationFound,
-        handInLocation,
-        privateNote,
-        status: "open"
-      });
+      const newFoundRef = await addDoc(collection(db, "foundItems"), itemData);
+      await checkPossibleMatchesForFoundItem(newFoundRef.id, itemData);
 
-      showMsg(foundSubmitMessage);
-      showPopup(foundSubmitMessage);
+      showPopup("Found item report submitted successfully.", "success");
       foundItemForm.reset();
-
-      if (foundImagePreview) {
-        foundImagePreview.src = "";
-        foundImagePreview.style.display = "none";
-      }
-    } catch (error) {
-      showMsg(error.message);
-      console.log(error);
+      if (foundImagePreview) foundImagePreview.style.display = "none";
+    } catch (err) {
+      showPopup(err.message || "Error submitting report.", "error");
     }
   });
 }
 
-/* CLAIM ITEM */
+/* CLAIM SUBMISSION */
 if (claimForm) {
   claimForm.addEventListener("submit", async function (e) {
     e.preventDefault();
-
-    showMsg("Submitting claim...");
-
     const user = auth.currentUser;
-    if (!user) {
-      showMsg("Please log in first.");
-      return;
-    }
+    if (!user) return;
 
     const selectedLostItemId = claimLostItemSelect?.value || "";
     const selectedFoundItemId = claimFoundItemSelect?.value || "";
@@ -1294,109 +871,39 @@ if (claimForm) {
     const claimLostPlace = document.getElementById("claimLostPlace").value.trim();
     const claimLostDate = document.getElementById("claimLostDate").value;
 
-    if (!selectedLostItemId) {
-      showMsg("Select your lost report first.");
-      showPopup("Select your lost report first.");
-      return;
-    }
-
-    if (!selectedFoundItemId) {
-      showMsg("Select a matching found-item report.");
-      showPopup("Select a matching found-item report.");
+    if (!selectedLostItemId || !selectedFoundItemId) {
+      showPopup("Please select both your lost report and a matching found item.", "warning");
       return;
     }
 
     try {
-      const lostRef = doc(db, "lostItems", selectedLostItemId);
-      const foundRef = doc(db, "foundItems", selectedFoundItemId);
+      const [lostSnap, foundSnap] = await Promise.all([
+        getDoc(doc(db, "lostItems", selectedLostItemId)),
+        getDoc(doc(db, "foundItems", selectedFoundItemId))
+      ]);
 
-      const [lostSnap, foundSnap] = await Promise.all([getDoc(lostRef), getDoc(foundRef)]);
-
-      if (!lostSnap.exists()) {
-        showMsg("The selected lost report no longer exists.");
-        showPopup("The selected lost report no longer exists.");
-        await loadUserLostReports(user.uid);
-        return;
-      }
-
-      if (!foundSnap.exists()) {
-        showMsg("The selected found-item report no longer exists.");
-        showPopup("The selected found-item report no longer exists.");
-        await loadMatchedFoundItemsForLostReport(selectedLostItemId, user.uid);
+      if (!lostSnap.exists() || !foundSnap.exists()) {
+        showPopup("One of the selected reports is no longer active.", "error");
         return;
       }
 
       const lostData = lostSnap.data();
       const foundData = foundSnap.data();
 
-      if (lostData.userId !== user.uid) {
-        showMsg("You can only claim using your own lost report.");
-        showPopup("You can only claim using your own lost report.");
-        return;
-      }
-
-      if (normalizeText(lostData.status) === "resolved") {
-        showMsg("This lost report is already resolved.");
-        showPopup("This lost report is already resolved.");
-        return;
-      }
-
-      if (normalizeText(foundData.status) === "claimed" || normalizeText(foundData.status) === "resolved") {
-        showMsg("This found item has already been claimed.");
-        showPopup("This found item has already been claimed.");
-        await loadMatchedFoundItemsForLostReport(selectedLostItemId, user.uid);
-        return;
-      }
-
-      if (foundData.userId === user.uid) {
-        showMsg("You reported this found item yourself. You do not need to file a claim for it.");
-        showPopup("You reported this found item yourself. You do not need to file a claim for it.");
-        return;
-      }
-
       const matchData = calculatePossibleMatch(lostData, foundData);
-      if (matchData.score < 45) {
-        showMsg("This found report is not a close enough match for the selected lost report.");
-        showPopup("This found report is not a close enough match for the selected lost report.");
+      if (matchData.score < 50) {
+        showPopup("This item is no longer marked as an eligible match.", "warning");
         return;
       }
-
-      const existingClaimsSnapshot = await getDocs(collection(db, "claims"));
-      let alreadyClaimedByUser = false;
-
-      existingClaimsSnapshot.forEach((docItem) => {
-        const existingClaim = docItem.data();
-        if (
-          existingClaim.userId === user.uid &&
-          existingClaim.lostItemId === selectedLostItemId &&
-          existingClaim.foundItemId === selectedFoundItemId &&
-          normalizeText(existingClaim.claimStatus) !== "rejected"
-        ) {
-          alreadyClaimedByUser = true;
-        }
-      });
-
-      if (alreadyClaimedByUser) {
-        showMsg("You already submitted a claim for this matched pair.");
-        showPopup("You already submitted a claim for this matched pair.");
-        return;
-      }
-
-      const itemName = foundData.itemName || lostData.itemName || "";
-      const category = foundData.category || lostData.category || "";
-      const foundItemLabel = `${foundData.itemName || ""} • ${foundData.category || ""} • ${foundData.handInLocation || "No hand-in location"}`;
-      const lostItemLabel = `${lostData.itemName || ""} • ${lostData.category || ""} • ${lostData.dateLost || "No date"}`;
 
       await addDoc(collection(db, "claims"), {
         userId: user.uid,
         lostItemId: selectedLostItemId,
-        lostItemOwnerId: lostData.userId || "",
-        lostItemLabel,
+        lostItemLabel: `${lostData.itemName} (${lostData.category})`,
         foundItemId: selectedFoundItemId,
-        foundItemOwnerId: foundData.userId || "",
-        foundItemLabel,
-        itemName,
-        category,
+        foundItemLabel: `${foundData.itemName} (${foundData.category})`,
+        itemName: foundData.itemName || lostData.itemName,
+        category: foundData.category,
         reason: claimReason,
         description: claimDescription,
         uniqueMarks: claimUniqueMarks,
@@ -1408,135 +915,115 @@ if (claimForm) {
         createdAt: new Date().toISOString()
       });
 
-      showMsg("Claim submitted successfully.");
-      showPopup("Claim submitted successfully.");
+      showPopup("Claim submitted successfully for admin verification.", "success");
       claimForm.reset();
-
-      if (claimMatchMessage) {
-        claimMatchMessage.textContent = "";
-      }
-
-      await loadUserLostReports(user.uid);
       resetClaimFoundItems();
-    } catch (error) {
-      showMsg(error.message);
-      console.log(error);
+      await loadUserLostReports(user.uid);
+    } catch (err) {
+      showPopup(err.message || "Claim submission failed.", "error");
     }
   });
 }
 
-/* BROWSE ITEMS */
+/* PUBLIC BROWSING - WITH SENSITIVE FOUND DETAILS REDACTED */
 async function loadItems() {
-  if (!lostItemsList || !foundItemsList) return;
-
-  lostItemsList.innerHTML = "Loading lost items...";
-  foundItemsList.innerHTML = "Loading found items...";
+  if (!lostItemsList && !foundItemsList) return;
 
   const searchText = searchInput ? searchInput.value.trim().toLowerCase() : "";
   const selectedCategory = categoryFilter ? categoryFilter.value.trim().toLowerCase() : "";
 
   try {
-    const lostSnapshot = await getDocs(collection(db, "lostItems"));
-    const foundSnapshot = await getDocs(collection(db, "foundItems"));
+    const [lostSnap, foundSnap] = await Promise.all([
+      getDocs(collection(db, "lostItems")),
+      getDocs(collection(db, "foundItems"))
+    ]);
 
-    lostItemsList.innerHTML = "";
-    foundItemsList.innerHTML = "";
+    if (lostItemsList) lostItemsList.innerHTML = "";
+    if (foundItemsList) foundItemsList.innerHTML = "";
 
-    lostSnapshot.forEach((docItem) => {
+    let lostCount = 0;
+    lostSnap.forEach((docItem) => {
       const item = docItem.data();
-      const currentStatus = normalizeText(item.status);
-
-      if (currentStatus === "resolved") return;
+      if (normalizeText(item.status) === "resolved") return;
 
       const itemName = (item.itemName || "").toLowerCase();
       const category = (item.category || "").toLowerCase();
-      const matchesSearch = !searchText || itemName.includes(searchText) || category.includes(searchText);
-      const matchesCategory = !selectedCategory || category === selectedCategory;
+      if (searchText && !itemName.includes(searchText) && !category.includes(searchText)) return;
+      if (selectedCategory && category !== selectedCategory) return;
 
-      if (!matchesSearch || !matchesCategory) return;
-
-      lostItemsList.innerHTML += `
-        <div class="items-box">
-          <h3>${item.itemName}</h3>
-          <p><strong>Category:</strong> ${item.category}</p>
-          <p><strong>Description:</strong> ${item.description}</p>
-          <p><strong>Date Lost:</strong> ${item.dateLost}</p>
-          <p><strong>Location Lost:</strong> ${item.locationLost}</p>
-          <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
-          ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
-        </div>
-      `;
+      lostCount++;
+      if (lostItemsList) {
+        lostItemsList.innerHTML += `
+          <div class="items-box">
+            <h3>${item.itemName}</h3>
+            <p><strong>Category:</strong> ${item.category}</p>
+            <p><strong>General Description:</strong> ${item.description}</p>
+            <p><strong>Date Lost:</strong> ${item.dateLost}</p>
+            <p><strong>Location Lost:</strong> ${item.locationLost}</p>
+            <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
+            ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
+          </div>
+        `;
+      }
     });
 
-    foundSnapshot.forEach((docItem) => {
+    let foundCount = 0;
+    foundSnap.forEach((docItem) => {
       const item = docItem.data();
-      const currentStatus = normalizeText(item.status);
-
-      if (currentStatus === "claimed" || currentStatus === "resolved") return;
+      const st = normalizeText(item.status);
+      if (st === "claimed" || st === "resolved") return;
 
       const itemName = (item.itemName || "").toLowerCase();
       const category = (item.category || "").toLowerCase();
-      const matchesSearch = !searchText || itemName.includes(searchText) || category.includes(searchText);
-      const matchesCategory = !selectedCategory || category === selectedCategory;
+      if (searchText && !itemName.includes(searchText) && !category.includes(searchText)) return;
+      if (selectedCategory && category !== selectedCategory) return;
 
-      if (!matchesSearch || !matchesCategory) return;
-
-      foundItemsList.innerHTML += `
-        <div class="items-box">
-          <h3>${item.itemName}</h3>
-          <p><strong>Category:</strong> ${item.category}</p>
-          <p><strong>Description:</strong> ${item.description}</p>
-          <p><strong>Date Found:</strong> ${item.dateFound}</p>
-          <p><strong>Location Found:</strong> ${item.locationFound}</p>
-          <p><strong>Handed In At:</strong> ${item.handInLocation}</p>
-          <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
-          ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
-        </div>
-      `;
+      foundCount++;
+      if (foundItemsList) {
+        // Redacts uniqueMarks, privateNote, exact custody details for fraud prevention
+        foundItemsList.innerHTML += `
+          <div class="items-box">
+            <h3>${item.itemName}</h3>
+            <p><strong>Category:</strong> ${item.category}</p>
+            <p><strong>General Description:</strong> ${item.description}</p>
+            <p><strong>Date Found:</strong> ${item.dateFound}</p>
+            <p><strong>Found Near:</strong> ${item.locationFound}</p>
+            <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
+            ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
+          </div>
+        `;
+      }
     });
 
-    if (lostItemsList.innerHTML === "") {
-      lostItemsList.innerHTML = "<p>No lost items found.</p>";
-    }
-
-    if (foundItemsList.innerHTML === "") {
-      foundItemsList.innerHTML = "<p>No found items found.</p>";
-    }
-
+    if (lostItemsList && lostCount === 0) lostItemsList.innerHTML = "<p>No active lost items found.</p>";
+    if (foundItemsList && foundCount === 0) foundItemsList.innerHTML = "<p>No active found items found.</p>";
     setupImageModal();
-  } catch (error) {
-    lostItemsList.innerHTML = "<p>Failed to load lost items.</p>";
-    foundItemsList.innerHTML = "<p>Failed to load found items.</p>";
-    console.log(error);
+  } catch (err) {
+    console.log(err);
   }
 }
 
-if (lostItemsList && foundItemsList) {
-  loadItems();
-}
-
+if (lostItemsList || foundItemsList) loadItems();
 if (searchBtn) searchBtn.addEventListener("click", loadItems);
 if (categoryFilter) categoryFilter.addEventListener("change", loadItems);
 if (searchInput) searchInput.addEventListener("input", loadItems);
 
-/* MY REPORTS */
+/* USER MY REPORTS CRUD */
 async function loadMyReports(userId) {
   if (!myLostItemsList || !myFoundItemsList || !myClaimsList) return;
 
-  myLostItemsList.innerHTML = "Loading your lost item reports...";
-  myFoundItemsList.innerHTML = "Loading your found item reports...";
-  myClaimsList.innerHTML = "Loading your claims...";
-
   try {
-    const lostSnapshot = await getDocs(collection(db, "lostItems"));
-    const foundSnapshot = await getDocs(collection(db, "foundItems"));
-    const claimsSnapshot = await getDocs(collection(db, "claims"));
+    const [lostSnap, foundSnap, claimsSnap] = await Promise.all([
+      getDocs(collection(db, "lostItems")),
+      getDocs(collection(db, "foundItems")),
+      getDocs(collection(db, "claims"))
+    ]);
 
     myLostItemsList.innerHTML = "";
     myFoundItemsList.innerHTML = "";
     myClaimsList.innerHTML = "";
 
-    lostSnapshot.forEach((docItem) => {
+    lostSnap.forEach((docItem) => {
       const item = docItem.data();
       if (item.userId !== userId) return;
 
@@ -1546,7 +1033,7 @@ async function loadMyReports(userId) {
           <p><strong>Category:</strong> ${item.category}</p>
           <p><strong>Description:</strong> ${item.description}</p>
           <p><strong>Date Lost:</strong> ${item.dateLost}</p>
-          <p><strong>Location Lost:</strong> ${item.locationLost}</p>
+          <p><strong>Location:</strong> ${item.locationLost}</p>
           <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
           ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
           <div class="action-row">
@@ -1557,7 +1044,7 @@ async function loadMyReports(userId) {
       `;
     });
 
-    foundSnapshot.forEach((docItem) => {
+    foundSnap.forEach((docItem) => {
       const item = docItem.data();
       if (item.userId !== userId) return;
 
@@ -1567,8 +1054,7 @@ async function loadMyReports(userId) {
           <p><strong>Category:</strong> ${item.category}</p>
           <p><strong>Description:</strong> ${item.description}</p>
           <p><strong>Date Found:</strong> ${item.dateFound}</p>
-          <p><strong>Location Found:</strong> ${item.locationFound}</p>
-          <p><strong>Handed In At:</strong> ${item.handInLocation}</p>
+          <p><strong>Handed In:</strong> ${item.handInLocation}</p>
           <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
           ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
           <div class="action-row">
@@ -1579,20 +1065,16 @@ async function loadMyReports(userId) {
       `;
     });
 
-    claimsSnapshot.forEach((docItem) => {
+    claimsSnap.forEach((docItem) => {
       const item = docItem.data();
       if (item.userId !== userId) return;
 
       myClaimsList.innerHTML += `
         <div class="items-box">
           <h3>${item.itemName}</h3>
-          <p><strong>Reason:</strong> ${item.reason}</p>
-          <p><strong>Description:</strong> ${item.description}</p>
-          <p><strong>Unique Marks:</strong> ${item.uniqueMarks}</p>
-          <p><strong>Contents:</strong> ${item.contents}</p>
-          <p><strong>Lost Place:</strong> ${item.lostPlace}</p>
-          <p><strong>Lost Date:</strong> ${item.lostDate}</p>
-          <p><strong>Status:</strong> ${getStatusBadge(item.claimStatus)}</p>
+          <p><strong>Proof Submitted:</strong> ${item.reason}</p>
+          <p><strong>Details:</strong> ${item.description}</p>
+          <p><strong>Verification Status:</strong> ${getStatusBadge(item.claimStatus)}</p>
           <div class="action-row">
             <button onclick="window.editClaimReport('${docItem.id}')">Edit</button>
             <button onclick="window.deleteClaimReport('${docItem.id}')">Delete</button>
@@ -1601,124 +1083,123 @@ async function loadMyReports(userId) {
       `;
     });
 
-    if (myLostItemsList.innerHTML === "") myLostItemsList.innerHTML = "<p>You have no lost item reports yet.</p>";
-    if (myFoundItemsList.innerHTML === "") myFoundItemsList.innerHTML = "<p>You have no found item reports yet.</p>";
-    if (myClaimsList.innerHTML === "") myClaimsList.innerHTML = "<p>You have no claims yet.</p>";
-
+    if (myLostItemsList.innerHTML === "") myLostItemsList.innerHTML = "<p>You have no active lost item reports.</p>";
+    if (myFoundItemsList.innerHTML === "") myFoundItemsList.innerHTML = "<p>You have no active found item reports.</p>";
+    if (myClaimsList.innerHTML === "") myClaimsList.innerHTML = "<p>You have not submitted any claims.</p>";
     setupImageModal();
-  } catch (error) {
-    myLostItemsList.innerHTML = "<p>Failed to load your lost item reports.</p>";
-    myFoundItemsList.innerHTML = "<p>Failed to load your found item reports.</p>";
-    myClaimsList.innerHTML = "<p>Failed to load your claims.</p>";
-    console.log(error);
+  } catch (err) {
+    console.log(err);
   }
 }
 
-window.editLostReport = async function (reportId) {
-  const reportRef = doc(db, "lostItems", reportId);
-  const snap = await getDoc(reportRef);
+window.editLostReport = async (reportId) => {
+  const refDoc = doc(db, "lostItems", reportId);
+  const snap = await getDoc(refDoc);
   if (!snap.exists()) return;
-
   const data = snap.data();
-  const newDescription = prompt("Edit description:", data.description || "");
-  if (newDescription === null) return;
-  const newLocation = prompt("Edit lost location:", data.locationLost || "");
-  if (newLocation === null) return;
 
-  await updateDoc(reportRef, {
-    description: newDescription.trim(),
-    locationLost: newLocation.trim()
+  const { value: newDesc } = await Swal.fire({
+    title: "Edit Description",
+    input: "textarea",
+    inputValue: data.description || "",
+    confirmButtonColor: "#1e3a8a",
+    showCancelButton: true
   });
+  if (newDesc === undefined) return;
 
-  await refreshVisiblePages();
+  await updateDoc(refDoc, { description: newDesc.trim() });
+  if (auth.currentUser) await loadMyReports(auth.currentUser.uid);
 };
 
-window.deleteLostReport = async function (reportId) {
-  if (!confirm("Delete this lost item report?")) return;
+window.deleteLostReport = async (reportId) => {
+  const res = await Swal.fire({
+    title: "Delete Report?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#ef4444",
+    confirmButtonText: "Yes, delete"
+  });
+  if (!res.isConfirmed) return;
   await deleteDoc(doc(db, "lostItems", reportId));
-  await refreshVisiblePages();
+  if (auth.currentUser) await loadMyReports(auth.currentUser.uid);
 };
 
-window.editFoundReport = async function (reportId) {
-  const reportRef = doc(db, "foundItems", reportId);
-  const snap = await getDoc(reportRef);
+window.editFoundReport = async (reportId) => {
+  const refDoc = doc(db, "foundItems", reportId);
+  const snap = await getDoc(refDoc);
   if (!snap.exists()) return;
-
   const data = snap.data();
-  const newDescription = prompt("Edit description:", data.description || "");
-  if (newDescription === null) return;
-  const newHandIn = prompt("Edit hand-in location:", data.handInLocation || "");
-  if (newHandIn === null) return;
 
-  await updateDoc(reportRef, {
-    description: newDescription.trim(),
-    handInLocation: newHandIn.trim()
+  const { value: newDesc } = await Swal.fire({
+    title: "Edit Description",
+    input: "textarea",
+    inputValue: data.description || "",
+    confirmButtonColor: "#1e3a8a",
+    showCancelButton: true
   });
+  if (newDesc === undefined) return;
 
-  await refreshVisiblePages();
+  await updateDoc(refDoc, { description: newDesc.trim() });
+  if (auth.currentUser) await loadMyReports(auth.currentUser.uid);
 };
 
-window.deleteFoundReport = async function (reportId) {
-  if (!confirm("Delete this found item report?")) return;
+window.deleteFoundReport = async (reportId) => {
+  const res = await Swal.fire({
+    title: "Delete Report?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#ef4444",
+    confirmButtonText: "Yes, delete"
+  });
+  if (!res.isConfirmed) return;
   await deleteDoc(doc(db, "foundItems", reportId));
-  await refreshVisiblePages();
+  if (auth.currentUser) await loadMyReports(auth.currentUser.uid);
 };
 
-window.editClaimReport = async function (reportId) {
-  const reportRef = doc(db, "claims", reportId);
-  const snap = await getDoc(reportRef);
+window.editClaimReport = async (reportId) => {
+  const refDoc = doc(db, "claims", reportId);
+  const snap = await getDoc(refDoc);
   if (!snap.exists()) return;
-
   const data = snap.data();
-  const newReason = prompt("Edit reason:", data.reason || "");
-  if (newReason === null) return;
-  const newDescription = prompt("Edit description:", data.description || "");
-  if (newDescription === null) return;
 
-  await updateDoc(reportRef, {
-    reason: newReason.trim(),
-    description: newDescription.trim()
+  const { value: newReason } = await Swal.fire({
+    title: "Edit Ownership Proof",
+    input: "textarea",
+    inputValue: data.reason || "",
+    confirmButtonColor: "#1e3a8a",
+    showCancelButton: true
   });
+  if (newReason === undefined) return;
 
-  await refreshVisiblePages();
+  await updateDoc(refDoc, { reason: newReason.trim() });
+  if (auth.currentUser) await loadMyReports(auth.currentUser.uid);
 };
 
-window.deleteClaimReport = async function (reportId) {
-  if (!confirm("Delete this claim?")) return;
+window.deleteClaimReport = async (reportId) => {
+  const res = await Swal.fire({
+    title: "Delete Claim?",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#ef4444",
+    confirmButtonText: "Yes, delete"
+  });
+  if (!res.isConfirmed) return;
   await deleteDoc(doc(db, "claims", reportId));
-  await refreshVisiblePages();
+  if (auth.currentUser) await loadMyReports(auth.currentUser.uid);
 };
 
 /* NOTIFICATIONS */
-const notifBtn = document.getElementById("notifBtn");
-const notifDropdown = document.getElementById("notifDropdown");
-if (notifBtn && notifDropdown) {
-  notifBtn.addEventListener("click", function (e) {
-    e.stopPropagation();
-    notifDropdown.classList.toggle("show");
-  });
-
-  document.addEventListener("click", function (e) {
-    if (!notifDropdown.contains(e.target) && e.target !== notifBtn) {
-      notifDropdown.classList.remove("show");
-    }
-  });
-}
-
 async function loadNotifications(userId) {
   if (!notificationsList) return;
-
-  notificationsList.innerHTML = "Loading...";
+  notificationsList.innerHTML = "Loading notifications...";
 
   try {
     const snapshot = await getDocs(collection(db, "notifications"));
-    let items = [];
+    const items = [];
 
     snapshot.forEach((docItem) => {
       const data = docItem.data();
-      if (data.userId === userId) {
-        items.push({ id: docItem.id, ...data });
-      }
+      if (data.userId === userId) items.push({ id: docItem.id, ...data });
     });
 
     items.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
@@ -1726,129 +1207,116 @@ async function loadNotifications(userId) {
 
     const notifBadge = document.getElementById("notifBadge");
     if (notifBadge) {
-      if (items.length > 0) {
-        notifBadge.textContent = items.length;
-        notifBadge.style.display = "inline-block";
-      } else {
-        notifBadge.style.display = "none";
-      }
+      notifBadge.textContent = items.length;
+      notifBadge.style.display = items.length > 0 ? "inline-block" : "none";
     }
 
     if (items.length === 0) {
-      notificationsList.innerHTML = "<p>No new notifications.</p>";
+      notificationsList.innerHTML = `<p class="helper-note" style="padding: 12px; text-align: center;">No notifications available.</p>`;
       return;
     }
 
     items.slice(0, 15).forEach((item) => {
+      let clickAction = "";
+      if (item.notificationKind === "possible_match") {
+        clickAction = `onclick="window.location.href='./claim-item.html'"`;
+      } else if (item.notificationKind === "claim_decision") {
+        clickAction = `onclick="window.location.href='./my-reports.html'"`;
+      }
+
       notificationsList.innerHTML += `
-        <div class="notification-item notif-item-small notification-${item.type || "info"}">
-          <button class="notif-delete-btn" onclick="window.deleteNotification('${item.id}')">✖</button>
+        <div class="notification-item notif-item-small notification-${item.type || "info"}" style="cursor: pointer;" ${clickAction}>
+          <button class="notif-delete-btn" onclick="event.stopPropagation(); window.deleteNotification('${item.id}')">✖</button>
           <p><strong>${item.title}</strong></p>
           <p>${item.text}</p>
         </div>
       `;
     });
-  } catch (error) {
-    notificationsList.innerHTML = "<p>Failed to load notifications.</p>";
-    console.log(error);
+  } catch (err) {
+    notificationsList.innerHTML = "<p class='helper-note' style='padding: 10px;'>No notifications available.</p>";
   }
 }
 
 window.deleteNotification = async function (notifId) {
-  if (!confirm("Delete this notification?")) return;
   try {
     await deleteDoc(doc(db, "notifications", notifId));
-    await refreshVisiblePages(); 
-  } catch (error) {
-    console.log("Error deleting notification:", error);
+    if (auth.currentUser) await loadNotifications(auth.currentUser.uid);
+  } catch (err) {
+    console.log(err);
   }
 };
 
-/* ADMIN */
-async function updateClaimStatus(claimId, status) {
-  try {
-    const claimRef = doc(db, "claims", claimId);
-    const claimSnap = await getDoc(claimRef);
-
-    if (claimSnap.exists()) {
-      const claimData = claimSnap.data();
-
-      await updateDoc(claimRef, {
-        claimStatus: status
-      });
-
-      await createNotification(
-        claimData.userId,
-        "Claim Update",
-        `Your claim for "${claimData.itemName}" is now ${status}.`,
-        status === "approved" ? "success" : "warning"
-      );
+if (notifBtn && notifDropdown) {
+  notifBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    notifDropdown.classList.toggle("show");
+  });
+  document.addEventListener("click", (e) => {
+    if (!notifDropdown.contains(e.target) && e.target !== notifBtn) {
+      notifDropdown.classList.remove("show");
     }
-
-    await refreshVisiblePages();
-  } catch (error) {
-    console.log(error);
-  }
+  });
 }
 
-async function updateItemStatus(collectionName, itemId, status) {
+/* ADMIN OVERVIEW & CLAIMS COMPARISON */
+async function loadAdminOverview() {
+  if (!adminLostCount && !adminFoundCount && !adminClaimsCount && !adminMatchesCount) return;
   try {
-    const itemRef = doc(db, collectionName, itemId);
-    const itemSnap = await getDoc(itemRef);
+    const [lostSnap, foundSnap, claimsSnap, matchesSnap] = await Promise.all([
+      getDocs(collection(db, "lostItems")),
+      getDocs(collection(db, "foundItems")),
+      getDocs(collection(db, "claims")),
+      getDocs(collection(db, "matchSuggestions"))
+    ]);
 
-    if (itemSnap.exists()) {
-      const itemData = itemSnap.data();
+    let activeLost = 0, resolvedLost = 0;
+    lostSnap.forEach((d) => normalizeText(d.data().status) === "resolved" ? resolvedLost++ : activeLost++);
 
-      await updateDoc(itemRef, {
-        status
-      });
+    let activeFound = 0, closedFound = 0;
+    foundSnap.forEach((d) => {
+      const st = normalizeText(d.data().status);
+      st === "claimed" || st === "resolved" ? closedFound++ : activeFound++;
+    });
 
-      await createNotification(
-        itemData.userId,
-        "Report Update",
-        `Your item report "${itemData.itemName}" is now marked as ${status}.`,
-        status === "resolved" || status === "claimed" ? "success" : "info"
-      );
-    }
+    let pendingClaims = 0, reviewedClaims = 0;
+    claimsSnap.forEach((d) => normalizeText(d.data().claimStatus) === "pending" ? pendingClaims++ : reviewedClaims++);
 
-    await refreshVisiblePages();
-  } catch (error) {
-    console.log(error);
+    let openMatches = 0, archivedMatches = 0;
+    matchesSnap.forEach((d) => {
+      const st = normalizeText(d.data().status);
+      !st || st === "suggested" || st === "open" ? openMatches++ : archivedMatches++;
+    });
+
+    if (adminLostCount) adminLostCount.textContent = `${activeLost} active`;
+    if (adminFoundCount) adminFoundCount.textContent = `${activeFound} active`;
+    if (adminClaimsCount) adminClaimsCount.textContent = `${pendingClaims} pending`;
+    if (adminMatchesCount) adminMatchesCount.textContent = `${openMatches} open`;
+
+    if (adminLostMeta) adminLostMeta.textContent = `${resolvedLost} resolved`;
+    if (adminFoundMeta) adminFoundMeta.textContent = `${closedFound} closed`;
+    if (adminClaimsMeta) adminClaimsMeta.textContent = `${reviewedClaims} reviewed`;
+    if (adminMatchesMeta) adminMatchesMeta.textContent = `${archivedMatches} archived`;
+  } catch (err) {
+    console.log(err);
   }
 }
-
-window.markLostResolved = function (itemId) {
-  updateItemStatus("lostItems", itemId, "resolved");
-};
-
-window.markFoundClaimed = function (itemId) {
-  updateItemStatus("foundItems", itemId, "claimed");
-};
 
 async function loadAdminData() {
-  if (
-    !adminLostItemsList &&
-    !adminResolvedLostItemsList &&
-    !adminFoundItemsList &&
-    !adminResolvedFoundItemsList &&
-    !adminClaimsList &&
-    !adminReviewedClaimsList &&
-    !adminMatchesList
-  ) return;
-
-  if (adminLostItemsList) adminLostItemsList.innerHTML = "Loading active lost items...";
-  if (adminResolvedLostItemsList) adminResolvedLostItemsList.innerHTML = "Loading resolved lost items...";
-  if (adminFoundItemsList) adminFoundItemsList.innerHTML = "Loading active found items...";
-  if (adminResolvedFoundItemsList) adminResolvedFoundItemsList.innerHTML = "Loading claimed/resolved found items...";
-  if (adminClaimsList) adminClaimsList.innerHTML = "Loading pending claims...";
-  if (adminReviewedClaimsList) adminReviewedClaimsList.innerHTML = "Loading reviewed claims...";
-  if (adminMatchesList) adminMatchesList.innerHTML = "Loading possible matches...";
+  if (!adminLostItemsList && !adminFoundItemsList && !adminClaimsList && !adminMatchesList) return;
 
   try {
-    const lostSnapshot = await getDocs(collection(db, "lostItems"));
-    const foundSnapshot = await getDocs(collection(db, "foundItems"));
-    const claimsSnapshot = await getDocs(collection(db, "claims"));
-    const matchesSnapshot = await getDocs(collection(db, "matchSuggestions"));
+    const [lostSnap, foundSnap, claimsSnap, matchesSnap] = await Promise.all([
+      getDocs(collection(db, "lostItems")),
+      getDocs(collection(db, "foundItems")),
+      getDocs(collection(db, "claims")),
+      getDocs(collection(db, "matchSuggestions"))
+    ]);
+
+    const lostMap = new Map();
+    lostSnap.forEach((d) => lostMap.set(d.id, d.data()));
+
+    const foundMap = new Map();
+    foundSnap.forEach((d) => foundMap.set(d.id, d.data()));
 
     if (adminLostItemsList) adminLostItemsList.innerHTML = "";
     if (adminResolvedLostItemsList) adminResolvedLostItemsList.innerHTML = "";
@@ -1858,298 +1326,376 @@ async function loadAdminData() {
     if (adminReviewedClaimsList) adminReviewedClaimsList.innerHTML = "";
     if (adminMatchesList) adminMatchesList.innerHTML = "";
 
-    const foundItemsById = new Map();
-    const anyFoundKeys = new Set();
-    const selfFoundKeys = new Set();
-    const lostKeysByOwner = new Set();
-
-    lostSnapshot.forEach((docItem) => {
+    // Admin Lost
+    lostSnap.forEach((docItem) => {
       const item = docItem.data();
-      lostKeysByOwner.add(buildOwnerItemKey(item.userId, item.itemName, item.category));
-    });
-
-    foundSnapshot.forEach((docItem) => {
-      const item = docItem.data();
-      foundItemsById.set(docItem.id, item);
-      anyFoundKeys.add(buildItemKey(item.itemName, item.category));
-      selfFoundKeys.add(buildOwnerItemKey(item.userId, item.itemName, item.category));
-    });
-
-    const approvedClaimFoundIds = new Set();
-    const pendingClaimFoundIds = new Set();
-
-    claimsSnapshot.forEach((docItem) => {
-      const item = docItem.data();
-      const currentStatus = normalizeText(item.claimStatus);
-      const foundItemId = item.foundItemId || "";
-
-      if (!foundItemId) return;
-      if (currentStatus === "approved") approvedClaimFoundIds.add(foundItemId);
-      if (currentStatus === "pending") pendingClaimFoundIds.add(foundItemId);
-    });
-
-    const approvedClaimKeys = new Set();
-    approvedClaimFoundIds.forEach((foundItemId) => {
-      const foundItem = foundItemsById.get(foundItemId);
-      if (foundItem) approvedClaimKeys.add(buildItemKey(foundItem.itemName, foundItem.category));
-    });
-
-    lostSnapshot.forEach((docItem) => {
-      const item = docItem.data();
-      const currentStatus = normalizeText(item.status);
-      const itemKey = buildItemKey(item.itemName, item.category);
-      const ownerKey = buildOwnerItemKey(item.userId, item.itemName, item.category);
-      const hasMatchingFoundReport = anyFoundKeys.has(itemKey);
-      const hasSelfFoundReport = selfFoundKeys.has(ownerKey);
-      const hasApprovedClaimMatch = approvedClaimKeys.has(itemKey);
-      const isResolved = currentStatus === "resolved";
-
-      let actionHtml = "";
-
-      if (isResolved) {
-        actionHtml = `<button disabled>Resolved</button>`;
-      } else if (hasSelfFoundReport || hasApprovedClaimMatch) {
-        actionHtml = `<button onclick="window.markLostResolved('${docItem.id}')">Mark Resolved</button>`;
-      } else if (hasMatchingFoundReport) {
-        actionHtml = `<button disabled>Waiting for claim approval</button>`;
-      } else {
-        actionHtml = `<button disabled>Waiting for found report</button>`;
-      }
-
-      const cardClass = isResolved ? "admin-box admin-box-muted" : "admin-box";
-      const cardHtml = `
-        <div class="${cardClass}">
+      const isResolved = normalizeText(item.status) === "resolved";
+      const card = `
+        <div class="admin-box ${isResolved ? "admin-box-muted" : ""}">
           <h3>${item.itemName}</h3>
           <p><strong>Category:</strong> ${item.category}</p>
           <p><strong>Description:</strong> ${item.description}</p>
-          <p><strong>Unique Marks:</strong> ${item.uniqueMarks || "—"}</p>
-          <p><strong>Date Lost:</strong> ${item.dateLost}</p>
-          <p><strong>Location Lost:</strong> ${item.locationLost}</p>
+          <p><strong>Unique Marks:</strong> ${item.uniqueMarks || "None"}</p>
+          <p><strong>Location:</strong> ${item.locationLost}</p>
           <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
-          <div class="action-row">${actionHtml}</div>
+          <div class="action-row">
+            ${!isResolved ? `<button onclick="window.markLostResolved('${docItem.id}')">Mark Resolved</button>` : `<button disabled>Resolved</button>`}
+          </div>
         </div>
       `;
-
-      if (isResolved) {
-        if (adminResolvedLostItemsList) adminResolvedLostItemsList.innerHTML += cardHtml;
-      } else {
-        if (adminLostItemsList) adminLostItemsList.innerHTML += cardHtml;
-      }
+      if (isResolved && adminResolvedLostItemsList) adminResolvedLostItemsList.innerHTML += card;
+      if (!isResolved && adminLostItemsList) adminLostItemsList.innerHTML += card;
     });
 
-    foundSnapshot.forEach((docItem) => {
+    // Admin Found (with Admin-Only Confidential Data)
+    foundSnap.forEach((docItem) => {
       const item = docItem.data();
-      const currentStatus = normalizeText(item.status);
-      const ownerKey = buildOwnerItemKey(item.userId, item.itemName, item.category);
-      const hasApprovedClaim = approvedClaimFoundIds.has(docItem.id);
-      const hasPendingClaim = pendingClaimFoundIds.has(docItem.id);
-      const selfOwnerRecovered = lostKeysByOwner.has(ownerKey);
-      const isClosed = currentStatus === "claimed" || currentStatus === "resolved";
-
-      let actionHtml = "";
-
-      if (isClosed) {
-        actionHtml = `<button disabled>Closed</button>`;
-      } else if (hasApprovedClaim || selfOwnerRecovered) {
-        actionHtml = `<button onclick="window.markFoundClaimed('${docItem.id}')">Mark Claimed</button>`;
-      } else if (hasPendingClaim) {
-        actionHtml = `<button disabled>Waiting for claim review</button>`;
-      } else {
-        actionHtml = `<button disabled>Waiting for matching claim</button>`;
-      }
-
-      const cardClass = isClosed ? "admin-box admin-box-muted" : "admin-box";
-      const cardHtml = `
-        <div class="${cardClass}">
+      const isClosed = normalizeText(item.status) === "claimed" || normalizeText(item.status) === "resolved";
+      const card = `
+        <div class="admin-box ${isClosed ? "admin-box-muted" : ""}">
           <h3>${item.itemName}</h3>
           <p><strong>Category:</strong> ${item.category}</p>
           <p><strong>Description:</strong> ${item.description}</p>
-          <p><strong>Unique Marks:</strong> ${item.uniqueMarks || "—"}</p>
-          <p><strong>Date Found:</strong> ${item.dateFound}</p>
-          <p><strong>Location Found:</strong> ${item.locationFound}</p>
-          <p><strong>Handed In At:</strong> ${item.handInLocation}</p>
+          <p><strong>Exact Found Place:</strong> ${item.locationFound}</p>
+          <p class="admin-confidential-field"><strong>Handed In At:</strong> ${item.handInLocation}</p>
+          <p class="admin-confidential-field"><strong>Unique Marks (Confidential):</strong> ${item.uniqueMarks || "None"}</p>
+          <p class="admin-confidential-field"><strong>Admin Private Note:</strong> ${item.privateNote || "None"}</p>
           <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
-          <div class="action-row">${actionHtml}</div>
+          <div class="action-row">
+            ${!isClosed ? `<button onclick="window.markFoundClaimed('${docItem.id}')">Mark Claimed</button>` : `<button disabled>Closed</button>`}
+          </div>
+        </div>
+      `;
+      if (isClosed && adminResolvedFoundItemsList) adminResolvedFoundItemsList.innerHTML += card;
+      if (!isClosed && adminFoundItemsList) adminFoundItemsList.innerHTML += card;
+    });
+
+    // Side-by-Side Claims Verification Comparison
+    claimsSnap.forEach((docItem) => {
+      const claim = docItem.data();
+      const isPending = normalizeText(claim.claimStatus) === "pending";
+      const lost = lostMap.get(claim.lostItemId) || {};
+      const found = foundMap.get(claim.foundItemId) || {};
+
+      const card = `
+        <div class="admin-box claim-comparison-card ${!isPending ? "admin-box-muted" : ""}">
+          <div class="claim-comparison-header">
+            <div>
+              <h3 style="margin-bottom: 2px;">Claim Verification: ${claim.itemName || "Item"}</h3>
+              <span class="helper-note">Submitted: ${new Date(claim.createdAt).toLocaleDateString()}</span>
+            </div>
+            <div>
+              <span class="theme-chip">Algorithmic Match Score: ${claim.matchScore || "N/A"}%</span>
+              ${getStatusBadge(claim.claimStatus)}
+            </div>
+          </div>
+
+          <div class="claim-comparison-grid">
+            <div class="claim-comparison-col">
+              <span class="claim-col-badge">1. Claimant Submitted Proof</span>
+              <p><strong>Reason for Claim:</strong> ${claim.reason}</p>
+              <p><strong>Detailed Description:</strong> ${claim.description}</p>
+              <p><strong>Identifying Marks:</strong> ${claim.uniqueMarks || "None specified"}</p>
+              <p><strong>Contents / Accessories:</strong> ${claim.contents || "None"}</p>
+              <p><strong>Stated Lost Date:</strong> ${claim.lostDate || "N/A"}</p>
+              <p><strong>Stated Lost Location:</strong> ${claim.lostPlace || "N/A"}</p>
+            </div>
+
+            <div class="claim-comparison-col">
+              <span class="claim-col-badge">2. Original Lost Report</span>
+              <p><strong>Item Title:</strong> ${lost.itemName || "N/A"}</p>
+              <p><strong>Category:</strong> ${lost.category || "N/A"}</p>
+              <p><strong>Description:</strong> ${lost.description || "N/A"}</p>
+              <p><strong>Marks:</strong> ${lost.uniqueMarks || "None"}</p>
+              <p><strong>Reported Date:</strong> ${lost.dateLost || "N/A"}</p>
+              <p><strong>Reported Location:</strong> ${lost.locationLost || "N/A"}</p>
+              ${lost.imageUrl ? `<img src="${lost.imageUrl}" alt="Lost Preview" class="item-thumb" />` : ""}
+            </div>
+
+            <div class="claim-comparison-col claim-col-confidential">
+              <span class="claim-col-badge badge-confidential">3. Found Report (Confidential Log)</span>
+              <p><strong>Item Title:</strong> ${found.itemName || "N/A"}</p>
+              <p><strong>Category:</strong> ${found.category || "N/A"}</p>
+              <p><strong>Public Description:</strong> ${found.description || "N/A"}</p>
+              <p class="admin-confidential-field"><strong>Handed In At:</strong> ${found.handInLocation || "N/A"}</p>
+              <p class="admin-confidential-field"><strong>Unique Marks (Secret):</strong> ${found.uniqueMarks || "None"}</p>
+              <p class="admin-confidential-field"><strong>Admin Private Note:</strong> ${found.privateNote || "None"}</p>
+              <p><strong>Found Date:</strong> ${found.dateFound || "N/A"}</p>
+              ${found.imageUrl ? `<img src="${found.imageUrl}" alt="Found Preview" class="item-thumb" />` : ""}
+            </div>
+          </div>
+
+          <div class="action-row" style="margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px;">
+            ${
+              isPending
+                ? `<button class="btn-approve" onclick="window.approveClaim('${docItem.id}')">Approve Claim & Mark Records Resolved</button>
+                   <button class="btn-reject" onclick="window.rejectClaim('${docItem.id}')">Reject Claim</button>`
+                : `<button disabled>Claim Reviewed (${claim.claimStatus})</button>`
+            }
+          </div>
         </div>
       `;
 
-      if (isClosed) {
-        if (adminResolvedFoundItemsList) adminResolvedFoundItemsList.innerHTML += cardHtml;
-      } else {
-        if (adminFoundItemsList) adminFoundItemsList.innerHTML += cardHtml;
-      }
+      if (isPending && adminClaimsList) adminClaimsList.innerHTML += card;
+      if (!isPending && adminReviewedClaimsList) adminReviewedClaimsList.innerHTML += card;
     });
 
-    claimsSnapshot.forEach((docItem) => {
-      const item = docItem.data();
-      const currentStatus = normalizeText(item.claimStatus);
-      const hasLinkedFoundItem = !!item.foundItemId;
-      const isPending = currentStatus === "pending" && hasLinkedFoundItem;
-
-      let actionHtml = "";
-
-      if (isPending) {
-        actionHtml = `
-          <button onclick="window.approveClaim('${docItem.id}')">Approve</button>
-          <button onclick="window.rejectClaim('${docItem.id}')">Reject</button>
-        `;
-      } else if (!hasLinkedFoundItem) {
-        actionHtml = `<button disabled>Legacy Claim</button>`;
-      } else {
-        actionHtml = `<button disabled>Reviewed</button>`;
-      }
-
-      const cardClass = isPending ? "admin-box" : "admin-box admin-box-muted";
-      const cardHtml = `
-        <div class="${cardClass}">
-          <h3>${item.itemName}</h3>
-          <p><strong>Lost Report:</strong> ${item.lostItemLabel || "Not linked"}</p>
-          <p><strong>Found Report:</strong> ${item.foundItemLabel || "Not linked"}</p>
-          <p><strong>Reason:</strong> ${item.reason}</p>
-          <p><strong>Description:</strong> ${item.description}</p>
-          <p><strong>Unique Marks:</strong> ${item.uniqueMarks}</p>
-          <p><strong>Contents:</strong> ${item.contents}</p>
-          <p><strong>Lost Place:</strong> ${item.lostPlace}</p>
-          <p><strong>Lost Date:</strong> ${item.lostDate}</p>
-          <p><strong>Match Score:</strong> ${item.matchScore || "—"}</p>
-          <p><strong>Status:</strong> ${getStatusBadge(item.claimStatus)}</p>
-          <div class="action-row">${actionHtml}</div>
-        </div>
-      `;
-
-      if (isPending) {
-        if (adminClaimsList) adminClaimsList.innerHTML += cardHtml;
-      } else {
-        if (adminReviewedClaimsList) adminReviewedClaimsList.innerHTML += cardHtml;
-      }
-    });
-
+    // Admin Match Suggestions
     if (adminMatchesList) {
-      matchesSnapshot.forEach((docItem) => {
+      matchesSnap.forEach((docItem) => {
         const item = docItem.data();
         adminMatchesList.innerHTML += `
           <div class="admin-box">
             <h3>${item.lostItemName} ↔ ${item.foundItemName}</h3>
             <p><strong>Category:</strong> ${item.category || "—"}</p>
-            <p><strong>Match Score:</strong> ${item.score || 0}</p>
-            <p><strong>Why matched:</strong> ${(item.reasons || []).join(", ") || "—"}</p>
-            <p><strong>Status:</strong> ${item.status || "suggested"}</p>
+            <p><strong>Match Score:</strong> ${item.score || 0}%</p>
+            <p><strong>Reasons:</strong> ${(item.reasons || []).join(", ") || "—"}</p>
           </div>
         `;
       });
     }
 
     if (adminLostItemsList && adminLostItemsList.innerHTML === "") adminLostItemsList.innerHTML = "<p>No active lost reports.</p>";
-    if (adminResolvedLostItemsList && adminResolvedLostItemsList.innerHTML === "") adminResolvedLostItemsList.innerHTML = "<p>No resolved lost reports yet.</p>";
     if (adminFoundItemsList && adminFoundItemsList.innerHTML === "") adminFoundItemsList.innerHTML = "<p>No active found reports.</p>";
-    if (adminResolvedFoundItemsList && adminResolvedFoundItemsList.innerHTML === "") adminResolvedFoundItemsList.innerHTML = "<p>No claimed/resolved found reports yet.</p>";
     if (adminClaimsList && adminClaimsList.innerHTML === "") adminClaimsList.innerHTML = "<p>No pending claims.</p>";
-    if (adminReviewedClaimsList && adminReviewedClaimsList.innerHTML === "") adminReviewedClaimsList.innerHTML = "<p>No reviewed claims yet.</p>";
-    if (adminMatchesList && adminMatchesList.innerHTML === "") adminMatchesList.innerHTML = "<p>No possible matches yet.</p>";
-  } catch (error) {
-    if (adminLostItemsList) adminLostItemsList.innerHTML = "<p>Failed to load active lost reports.</p>";
-    if (adminResolvedLostItemsList) adminResolvedLostItemsList.innerHTML = "<p>Failed to load resolved lost reports.</p>";
-    if (adminFoundItemsList) adminFoundItemsList.innerHTML = "<p>Failed to load active found reports.</p>";
-    if (adminResolvedFoundItemsList) adminResolvedFoundItemsList.innerHTML = "<p>Failed to load claimed/resolved found reports.</p>";
-    if (adminClaimsList) adminClaimsList.innerHTML = "<p>Failed to load pending claims.</p>";
-    if (adminReviewedClaimsList) adminReviewedClaimsList.innerHTML = "<p>Failed to load reviewed claims.</p>";
-    if (adminMatchesList) adminMatchesList.innerHTML = "<p>Failed to load possible matches.</p>";
-    console.log(error);
+    if (adminMatchesList && adminMatchesList.innerHTML === "") adminMatchesList.innerHTML = "<p>No automated matches generated.</p>";
+    setupImageModal();
+  } catch (err) {
+    console.log(err);
   }
 }
 
-window.approveClaim = function (claimId) {
-  updateClaimStatus(claimId, "approved");
-};
+function handleAdminFilters() {
+  if (adminLostFilter) {
+    adminLostFilter.addEventListener("change", () => {
+      const mode = adminLostFilter.value;
+      if (adminLostActiveSection) adminLostActiveSection.style.display = mode === "resolved" ? "none" : "block";
+      if (adminLostResolvedSection) adminLostResolvedSection.style.display = mode === "active" ? "none" : "block";
+    });
+  }
 
-window.rejectClaim = function (claimId) {
-  updateClaimStatus(claimId, "rejected");
-};
-
-if (adminLostCount || adminFoundCount || adminClaimsCount || adminMatchesCount) {
-  loadAdminOverview();
+  if (adminFoundFilter) {
+    adminFoundFilter.addEventListener("change", () => {
+      const mode = adminFoundFilter.value;
+      if (adminFoundActiveSection) adminFoundActiveSection.style.display = mode === "resolved" ? "none" : "block";
+      if (adminFoundResolvedSection) adminFoundResolvedSection.style.display = mode === "active" ? "none" : "block";
+    });
+  }
 }
 
-if (adminLostItemsList || adminFoundItemsList || adminClaimsList || adminMatchesList) {
-  loadAdminData();
+window.markLostResolved = async (id) => {
+  await updateDoc(doc(db, "lostItems", id), { status: "resolved" });
+  await loadAdminData();
+  await loadAdminOverview();
+};
+
+window.markFoundClaimed = async (id) => {
+  await updateDoc(doc(db, "foundItems", id), { status: "claimed" });
+  await loadAdminData();
+  await loadAdminOverview();
+};
+
+/* CLAIM APPROVAL WORKFLOW */
+window.approveClaim = async (claimId) => {
+  try {
+    const claimRef = doc(db, "claims", claimId);
+    const claimSnap = await getDoc(claimRef);
+    if (!claimSnap.exists()) return;
+
+    const claim = claimSnap.data();
+
+    // 1. Mark Claim Approved
+    await updateDoc(claimRef, {
+      claimStatus: "approved",
+      reviewedAt: new Date().toISOString()
+    });
+
+    // 2. Mark Lost Report Resolved in DB
+    if (claim.lostItemId) {
+      await updateDoc(doc(db, "lostItems", claim.lostItemId), {
+        status: "resolved",
+        resolvedAt: new Date().toISOString()
+      });
+    }
+
+    // 3. Mark Found Report Claimed in DB
+    if (claim.foundItemId) {
+      await updateDoc(doc(db, "foundItems", claim.foundItemId), {
+        status: "claimed",
+        claimedAt: new Date().toISOString()
+      });
+    }
+
+    // 4. Notify Claimant
+    await createNotification(
+      claim.userId,
+      "Claim Approved!",
+      `Your claim for "${claim.itemName}" has been approved. Visit the security/admin desk to collect your item.`,
+      "success",
+      { notificationKind: "claim_decision" }
+    );
+
+    showPopup("Claim approved. Records updated to Resolved/Claimed in database.", "success");
+    await loadAdminData();
+    await loadAdminOverview();
+  } catch (err) {
+    showPopup(err.message || "Failed to approve claim.", "error");
+  }
+};
+
+/* CLAIM REJECTION WORKFLOW */
+window.rejectClaim = async (claimId) => {
+  try {
+    const claimRef = doc(db, "claims", claimId);
+    const claimSnap = await getDoc(claimRef);
+    if (!claimSnap.exists()) return;
+
+    const claim = claimSnap.data();
+
+    // 1. Mark Claim Rejected (Lost & Found reports remain Active)
+    await updateDoc(claimRef, {
+      claimStatus: "rejected",
+      reviewedAt: new Date().toISOString()
+    });
+
+    // 2. Notify Claimant
+    await createNotification(
+      claim.userId,
+      "Claim Rejected",
+      `Your claim for "${claim.itemName}" could not be verified by the admin team.`,
+      "error",
+      { notificationKind: "claim_decision" }
+    );
+
+    showPopup("Claim rejected. Corresponding reports remain active.", "info");
+    await loadAdminData();
+    await loadAdminOverview();
+  } catch (err) {
+    showPopup(err.message || "Failed to reject claim.", "error");
+  }
+};
+
+/* MODAL & PROFILE DROPDOWN */
+function setupImageModal() {
+  let modal = document.getElementById("imageModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "imageModal";
+    modal.className = "image-modal";
+    modal.innerHTML = `<button class="image-modal-close" id="imageModalClose">Close</button><img id="imageModalImg" alt="Preview" />`;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal || e.target.id === "imageModalClose") modal.style.display = "none";
+    });
+  }
+  const modalImg = document.getElementById("imageModalImg");
+  document.querySelectorAll(".item-thumb").forEach((img) => {
+    img.onclick = () => {
+      modalImg.src = img.src;
+      modal.style.display = "flex";
+    };
+  });
 }
 
-/* AUTH STATE / PAGE PROTECTION */
+function setupProfileMenu() {
+  if (!profileMenuBtn || !profileDropdown) return;
+  profileMenuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    profileDropdown.classList.toggle("show");
+  });
+  document.addEventListener("click", (e) => {
+    if (!profileDropdown.contains(e.target) && e.target !== profileMenuBtn) {
+      profileDropdown.classList.remove("show");
+    }
+  });
+}
+
+/* INITIALIZATION */
+applyTheme(getStoredThemeMode());
+showImagePreview(passportInput, passportPreview);
+showImagePreview(lostImageInput, lostImagePreview);
+showImagePreview(foundImageInput, foundImagePreview);
+showImagePreview(settingsPassportInput, settingsPassportPreview);
+setupProfileMenu();
+setupThemeControls();
+handleAdminFilters();
+
+/* HOME FEATURE CARDS CLICK HANDLERS */
+const featureReportLost = document.getElementById("featureReportLost");
+const featureReportFound = document.getElementById("featureReportFound");
+
+if (featureReportLost) {
+  featureReportLost.addEventListener("click", () => {
+    if (auth.currentUser) {
+      window.location.href = "./report-lost.html";
+    } else {
+      Swal.fire({
+        title: "Account Required",
+        text: "You need to create an account before reporting a lost item.",
+        icon: "info",
+        confirmButtonText: "Continue",
+        confirmButtonColor: "#1e3a8a"
+      }).then(() => { window.location.href = "./register.html"; });
+    }
+  });
+}
+
+if (featureReportFound) {
+  featureReportFound.addEventListener("click", () => {
+    if (auth.currentUser) {
+      window.location.href = "./report-found.html";
+    } else {
+      Swal.fire({
+        title: "Account Required",
+        text: "You need to create an account before reporting a found item.",
+        icon: "info",
+        confirmButtonText: "Continue",
+        confirmButtonColor: "#1e3a8a"
+      }).then(() => { window.location.href = "./register.html"; });
+    }
+  });
+}
+
+/* AUTH OBSERVER & ROUTE GUARD */
 onAuthStateChanged(auth, async (user) => {
   const path = window.location.pathname.toLowerCase();
-
   const navDashboard = document.getElementById("navDashboard");
-  const authLinks = document.querySelectorAll('a[href="./login.html"], a[href="./register.html"]');
+  const authLinks = document.querySelectorAll('#navLogin, #navRegister');
 
-  const isAdminOverviewPage = path.endsWith("/admin") || path.endsWith("/admin.html");
-  const isAdminLostPage = path.endsWith("/admin-lost") || path.endsWith("/admin-lost.html");
-  const isAdminFoundPage = path.endsWith("/admin-found") || path.endsWith("/admin-found.html");
-  const isAdminClaimsPage = path.endsWith("/admin-claims") || path.endsWith("/admin-claims.html");
-  const isAdminMatchesPage = path.endsWith("/admin-matches") || path.endsWith("/admin-matches.html");
-  const isAdminPage = isAdminOverviewPage || isAdminLostPage || isAdminFoundPage || isAdminClaimsPage || isAdminMatchesPage;
-
-  const isDashboardPage = path.endsWith("/dashboard") || path.endsWith("/dashboard.html");
-  const isLostPage = path.endsWith("/report-lost") || path.endsWith("/report-lost.html");
-  const isFoundPage = path.endsWith("/report-found") || path.endsWith("/report-found.html");
-  const isClaimPage = path.endsWith("/claim-item") || path.endsWith("/claim-item.html");
-  const isSettingsPage = path.endsWith("/settings") || path.endsWith("/settings.html");
-  const isMyReportsPage = path.endsWith("/my-reports") || path.endsWith("/my-reports.html");
-  const isProfilePage = path.endsWith("/profile") || path.endsWith("/profile.html");
+  const isAdminPage = path.includes("admin");
+  const isProtectedUserPage = ["dashboard", "report-lost", "report-found", "claim-item", "settings", "my-reports", "profile"].some((p) => path.includes(p));
 
   if (user) {
     if (navDashboard) navDashboard.style.display = "inline-flex";
-    authLinks.forEach(link => link.style.display = "none");
+    authLinks.forEach((l) => l.style.display = "none");
 
-    try {
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
+    const userSnap = await getDoc(doc(db, "users", user.uid));
+    const role = userSnap.exists() ? (userSnap.data().role || "student").toLowerCase() : "student";
+    const fullName = userSnap.exists() ? userSnap.data().fullName : "User";
 
-      let role = "student";
-      let fullName = "User";
+    if (welcomeUser) welcomeUser.textContent = role === "admin" ? `Welcome, ${fullName} (Admin).` : `Welcome, ${fullName}.`;
 
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        role = userData.role || "student";
-        fullName = userData.fullName || "User";
-      }
-
-      if (welcomeUser) {
-        if ((role || "").toLowerCase() === "admin") {
-          welcomeUser.textContent = `Welcome, ${fullName} (Admin).`;
-        } else {
-          welcomeUser.textContent = `Welcome, ${fullName}.`;
-        }
-      }
-
-      const normalizedRole = (role || "").trim().toLowerCase();
-
-      if (normalizedRole !== "admin" && isAdminPage) {
-        alert("Access denied.");
-        window.location.href = "./dashboard.html";
-        return;
-      }
-
-      if (normalizedRole === "admin" && isDashboardPage) {
-        window.location.href = "./admin.html";
-        return;
-      }
-
-      if (isSettingsPage) loadSettings(user);
-      if (isMyReportsPage) loadMyReports(user.uid);
-      if (claimLostItemSelect) loadUserLostReports(user.uid);
-      if (isProfilePage) loadProfile(user);
-      if (notificationsList) loadNotifications(user.uid);
-      
-    } catch (error) {
-      console.log(error);
+    if (role !== "admin" && isAdminPage) {
+      window.location.href = "./dashboard.html";
+      return;
     }
+
+    if (role === "admin" && path.endsWith("dashboard.html")) {
+      window.location.href = "./admin.html";
+      return;
+    }
+
+    if (path.includes("settings")) loadSettings(user);
+    if (path.includes("profile")) loadProfile(user);
+    if (path.includes("my-reports")) loadMyReports(user.uid);
+    if (claimLostItemSelect) loadUserLostReports(user.uid);
+    if (notificationsList) loadNotifications(user.uid);
   } else {
     if (navDashboard) navDashboard.style.display = "none";
-    
-    authLinks.forEach(link => link.style.display = "");
-
-    if (isAdminPage || isDashboardPage || isLostPage || isFoundPage || isClaimPage || isSettingsPage || isMyReportsPage || isProfilePage) {
-      window.location.href = "./login.html";
-    }
+    authLinks.forEach((l) => l.style.display = "");
+    if (isAdminPage || isProtectedUserPage) window.location.href = "./login.html";
   }
+
+  if (adminLostCount || adminFoundCount || adminClaimsCount || adminMatchesCount) loadAdminOverview();
+  if (adminLostItemsList || adminFoundItemsList || adminClaimsList || adminMatchesList) loadAdminData();
 });
