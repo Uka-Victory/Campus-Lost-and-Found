@@ -1,4 +1,4 @@
-import { auth, db, storage } from "./firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -20,14 +20,10 @@ import {
   collection,
   getDocs,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  query,
+  where
 } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
-
-import {
-  ref,
-  uploadBytes,
-  getDownloadURL
-} from "https://www.gstatic.com/firebasejs/12.10.0/firebase-storage.js";
 
 /* PAGE ELEMENTS */
 const registerForm = document.getElementById("registerForm");
@@ -81,6 +77,9 @@ const adminFoundResolvedSection = document.getElementById("adminFoundResolvedSec
 const myLostItemsList = document.getElementById("myLostItemsList");
 const myFoundItemsList = document.getElementById("myFoundItemsList");
 const myClaimsList = document.getElementById("myClaimsList");
+const myResolvedLostItemsList = document.getElementById("myResolvedLostItemsList");
+const myResolvedFoundItemsList = document.getElementById("myResolvedFoundItemsList");
+const myReviewedClaimsList = document.getElementById("myReviewedClaimsList");
 
 const notificationsList = document.getElementById("notificationsList");
 const notifBtn = document.getElementById("notifBtn");
@@ -112,12 +111,46 @@ const passportPreview = document.getElementById("passportPreview");
 const lostImagePreview = document.getElementById("lostImagePreview");
 const foundImagePreview = document.getElementById("foundImagePreview");
 
-/* HELPERS */
+const dashboardClaimCount = document.getElementById("dashboardClaimCount");
+
+/* VALID CATEGORY ENUM (matches the forms) */
+const VALID_CATEGORIES = new Set([
+  "Electronics", "Books", "ID Card", "Keys", "Bags", "Clothes", "Others"
+]);
+
+const MAX_OPEN_REPORTS = 5;
+
+/* CLOUDINARY IMAGE UPLOAD */
+const CLOUDINARY_CLOUD_NAME = "v5dxi57o";
+const CLOUDINARY_UPLOAD_PRESET = "campus_lost_found";
+
 async function uploadImage(file, folderName) {
   if (!file) return "";
-  const fileRef = ref(storage, `${folderName}/${Date.now()}_${file.name}`);
-  await uploadBytes(fileRef, file);
-  return await getDownloadURL(fileRef);
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    formData.append("folder", `campus-lost-found/${folderName}`);
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: "POST", body: formData }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.log("Cloudinary upload failed:", errText);
+      return "";
+    }
+
+    const data = await res.json();
+    const rawUrl = data.secure_url || "";
+    // Inject f_auto,q_auto for automatic WebP/AVIF delivery and adaptive quality
+    return rawUrl.replace("/upload/", "/upload/f_auto,q_auto/");
+  } catch (err) {
+    console.log("Cloudinary upload error:", err);
+    return "";
+  }
 }
 
 function showImagePreview(inputElement, previewElement) {
@@ -145,6 +178,12 @@ function getStatusBadge(status) {
   return `<span class="status-badge status-${safeStatus}">${label}</span>`;
 }
 
+function getConfidenceLabel(score) {
+  if (score >= 80) return "High";
+  if (score >= 60) return "Medium";
+  return "Low";
+}
+
 function showPopup(text, icon = "info") {
   if (typeof Swal !== "undefined") {
     Swal.fire({
@@ -153,6 +192,10 @@ function showPopup(text, icon = "info") {
       confirmButtonColor: "#1e3a8a"
     });
   }
+}
+
+function isValidCategory(cat) {
+  return VALID_CATEGORIES.has((cat || "").trim());
 }
 
 /* THEME SYSTEM */
@@ -207,9 +250,11 @@ if (systemThemeQuery.addEventListener) {
     if (getStoredThemeMode() === "auto") applyTheme("auto");
   });
 }
-
 /* TEXT TOKENIZATION & MATCHING ENGINE */
-const STOP_WORDS = new Set(["the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "with", "is", "was", "it", "my", "of", "this", "that", "i", "lost", "found", "item", "please", "phone", "bag", "device"]);
+const STOP_WORDS = new Set([
+  "the", "a", "an", "and", "or", "in", "on", "at", "to", "for", "with",
+  "is", "was", "it", "my", "of", "this", "that", "i", "lost", "found", "item", "please"
+]);
 
 function normalizeText(value) {
   return (value || "").trim().toLowerCase();
@@ -234,7 +279,10 @@ function textSimilarity(a, b) {
   });
 
   const union = new Set([...tokensA, ...tokensB]).size;
-  return union === 0 ? 0 : overlap / union;
+  const jaccard = union === 0 ? 0 : overlap / union;
+  const containment = overlap / Math.min(tokensA.size, tokensB.size);
+
+  return Math.max(jaccard, containment);
 }
 
 function dateClosenessScore(dateA, dateB) {
@@ -256,15 +304,17 @@ function calculatePossibleMatch(lostItem, foundItem) {
   const lostCat = normalizeText(lostItem.category);
   const foundCat = normalizeText(foundItem.category);
 
-  // 1. Mandatory Category Match (unless both categorize as "Others")
+  // 1. Category gate
   if (lostCat && foundCat && lostCat === foundCat) {
     score += 35;
     reasons.push("same category");
   } else if (lostCat === "others" && foundCat === "others") {
     score += 15;
-    reasons.push("category: others");
+    reasons.push("category: both unclassified");
+  } else if (lostCat === "others" || foundCat === "others") {
+    score += 10;
+    reasons.push("category: one side unclassified");
   } else {
-    // Immediate disqualification if categories disagree
     return { score: 0, reasons: [] };
   }
 
@@ -278,7 +328,7 @@ function calculatePossibleMatch(lostItem, foundItem) {
     reasons.push("item title similarity");
   }
 
-  // 3. Keyword / Description Overlap
+  // 3. Description / Unique Marks Overlap
   const detailsSim = textSimilarity(
     `${lostItem.description || ""} ${lostItem.uniqueMarks || ""}`,
     `${foundItem.description || ""} ${foundItem.uniqueMarks || ""}`
@@ -305,17 +355,19 @@ function calculatePossibleMatch(lostItem, foundItem) {
     reasons.push("reported close in date");
   }
 
-  return { score, reasons };
+  // Cap at 100
+  return { score: Math.min(score, 100), reasons };
 }
 
 async function hasExistingMatchSuggestion(lostItemId, foundItemId) {
-  const snapshot = await getDocs(collection(db, "matchSuggestions"));
+  const q = query(
+    collection(db, "matchSuggestions"),
+    where("lostItemId", "==", lostItemId)
+  );
+  const snapshot = await getDocs(q);
   let exists = false;
   snapshot.forEach((docItem) => {
-    const data = docItem.data();
-    if (data.lostItemId === lostItemId && data.foundItemId === foundItemId) {
-      exists = true;
-    }
+    if (docItem.data().foundItemId === foundItemId) exists = true;
   });
   return exists;
 }
@@ -357,13 +409,12 @@ async function createPossibleMatchSuggestion(lostItemId, lostItem, foundItemId, 
   await createNotification(
     lostItem.userId,
     "Potential Match Found",
-    `A found report matching "${lostItem.itemName}" was posted (${matchData.score}% match). Click to inspect and file a claim.`,
+    `A potential match for "${lostItem.itemName}" has been found. Open the claim page to review and file a claim if it belongs to you.`,
     "info",
     {
       notificationKind: "possible_match",
       lostItemId,
-      foundItemId,
-      matchScore: matchData.score
+      foundItemId
     }
   );
 }
@@ -417,13 +468,14 @@ async function loadUserLostReports(userId) {
   claimLostItemSelect.innerHTML = `<option value="">Loading your active lost reports...</option>`;
 
   try {
-    const snapshot = await getDocs(collection(db, "lostItems"));
+    const q = query(collection(db, "lostItems"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
     claimLostItemSelect.innerHTML = `<option value="">Select your lost report</option>`;
     let count = 0;
 
     snapshot.forEach((docItem) => {
       const item = docItem.data();
-      if (item.userId !== userId || normalizeText(item.status) === "resolved") return;
+      if (normalizeText(item.status) === "resolved") return;
 
       const option = document.createElement("option");
       option.value = docItem.id;
@@ -492,7 +544,7 @@ async function loadMatchedFoundItemsForLostReport(lostItemId, userId) {
     if (matches.length === 0) {
       claimFoundItemSelect.innerHTML = `<option value="">No matching found items available</option>`;
       if (claimMatchMessage) {
-        claimMatchMessage.textContent = "No verified matching found items found. Try updating your lost report description.";
+        claimMatchMessage.textContent = "No matching found items were found for this lost report. Try updating your description or check back later.";
       }
       syncClaimItemName();
       return;
@@ -504,7 +556,7 @@ async function loadMatchedFoundItemsForLostReport(lostItemId, userId) {
       option.value = match.id;
       option.dataset.itemName = match.data.itemName || "";
       option.dataset.category = match.data.category || "";
-      option.textContent = `${match.data.itemName} • ${match.data.category} • Match Score: ${match.score}%`;
+      option.textContent = `${match.data.itemName} • ${match.data.category}`;
       claimFoundItemSelect.appendChild(option);
     });
 
@@ -525,7 +577,6 @@ if (claimLostItemSelect) {
     if (user) await loadMatchedFoundItemsForLostReport(claimLostItemSelect.value, user.uid);
   });
 }
-
 /* AUTHENTICATION */
 if (registerForm) {
   registerForm.addEventListener("submit", async function (e) {
@@ -699,7 +750,14 @@ async function loadProfile(user) {
     if (profileDepartment) profileDepartment.textContent = data.department || "-";
     if (profileLevel) profileLevel.textContent = data.level || "-";
     if (profileRole) profileRole.textContent = data.role || "student";
-    if (profilePassport && data.passportUrl) profilePassport.src = data.passportUrl;
+    if (profilePassport) {
+      if (data.passportUrl) {
+        profilePassport.src = data.passportUrl;
+        profilePassport.style.display = "block";
+      } else {
+        profilePassport.style.display = "none";
+      }
+    }
   } catch (error) {
     console.log(error);
   }
@@ -748,8 +806,12 @@ if (settingsForm) {
       await updateDoc(userRef, { fullName, phone, email, faculty, department, level });
 
       if (settingsPassportFile) {
-        const passportUrl = await uploadImage(settingsPassportFile, "passports");
-        if (passportUrl) await updateDoc(userRef, { passportUrl });
+        try {
+          const passportUrl = await uploadImage(settingsPassportFile, "passports");
+          if (passportUrl) await updateDoc(userRef, { passportUrl });
+        } catch (err) {
+          console.log("Passport upload error:", err);
+        }
       }
 
       showPopup("Settings updated successfully.", "success");
@@ -778,9 +840,33 @@ if (lostItemForm) {
     const locationLost = document.getElementById("locationLost").value.trim();
     const lostImageFile = document.getElementById("lostImage")?.files[0] || null;
 
+    if (!itemName || !description || !dateLost || !locationLost) {
+      showPopup("Please fill in all required fields.", "warning");
+      return;
+    }
+
+    if (!isValidCategory(category)) {
+      showPopup("Please select a valid category.", "warning");
+      return;
+    }
+
     try {
+      const checkQ = query(collection(db, "lostItems"), where("userId", "==", user.uid));
+      const checkSnap = await getDocs(checkQ);
+      const openCount = checkSnap.docs.filter((d) => normalizeText(d.data().status) === "open").length;
+      if (openCount >= MAX_OPEN_REPORTS) {
+        showPopup(`You already have ${MAX_OPEN_REPORTS} open lost reports. Please close some before adding more.`, "warning");
+        return;
+      }
+
       let imageUrl = "";
-      if (lostImageFile) imageUrl = await uploadImage(lostImageFile, "lost-items");
+      if (lostImageFile) {
+        try {
+          imageUrl = await uploadImage(lostImageFile, "lost-items");
+        } catch (err) {
+          console.log("Lost image upload error:", err);
+        }
+      }
 
       const itemData = {
         userId: user.uid,
@@ -824,9 +910,33 @@ if (foundItemForm) {
     const privateNote = document.getElementById("privateNote").value.trim();
     const foundImageFile = document.getElementById("foundImage")?.files[0] || null;
 
+    if (!itemName || !description || !dateFound || !locationFound || !handInLocation || !privateNote) {
+      showPopup("Please fill in all required fields.", "warning");
+      return;
+    }
+
+    if (!isValidCategory(category)) {
+      showPopup("Please select a valid category.", "warning");
+      return;
+    }
+
     try {
+      const checkQ = query(collection(db, "foundItems"), where("userId", "==", user.uid));
+      const checkSnap = await getDocs(checkQ);
+      const openCount = checkSnap.docs.filter((d) => normalizeText(d.data().status) === "open").length;
+      if (openCount >= MAX_OPEN_REPORTS) {
+        showPopup(`You already have ${MAX_OPEN_REPORTS} open found reports. Please close some before adding more.`, "warning");
+        return;
+      }
+
       let imageUrl = "";
-      if (foundImageFile) imageUrl = await uploadImage(foundImageFile, "found-items");
+      if (foundImageFile) {
+        try {
+          imageUrl = await uploadImage(foundImageFile, "found-items");
+        } catch (err) {
+          console.log("Found image upload error:", err);
+        }
+      }
 
       const itemData = {
         userId: user.uid,
@@ -854,7 +964,6 @@ if (foundItemForm) {
     }
   });
 }
-
 /* CLAIM SUBMISSION */
 if (claimForm) {
   claimForm.addEventListener("submit", async function (e) {
@@ -876,7 +985,24 @@ if (claimForm) {
       return;
     }
 
+    if (!claimReason || !claimDescription || !claimUniqueMarks || !claimLostPlace || !claimLostDate) {
+      showPopup("Please fill in all required claim fields.", "warning");
+      return;
+    }
+
     try {
+      const existingQ = query(collection(db, "claims"), where("userId", "==", user.uid));
+      const existingSnap = await getDocs(existingQ);
+      const hasPending = existingSnap.docs.some((d) => {
+        const data = d.data();
+        return data.foundItemId === selectedFoundItemId &&
+          normalizeText(data.claimStatus) === "pending";
+      });
+      if (hasPending) {
+        showPopup("You already have a pending claim for this item. Please wait for admin review.", "warning");
+        return;
+      }
+
       const [lostSnap, foundSnap] = await Promise.all([
         getDoc(doc(db, "lostItems", selectedLostItemId)),
         getDoc(doc(db, "foundItems", selectedFoundItemId))
@@ -925,7 +1051,7 @@ if (claimForm) {
   });
 }
 
-/* PUBLIC BROWSING - WITH SENSITIVE FOUND DETAILS REDACTED */
+/* PUBLIC BROWSING */
 async function loadItems() {
   if (!lostItemsList && !foundItemsList) return;
 
@@ -948,7 +1074,11 @@ async function loadItems() {
 
       const itemName = (item.itemName || "").toLowerCase();
       const category = (item.category || "").toLowerCase();
-      if (searchText && !itemName.includes(searchText) && !category.includes(searchText)) return;
+      const description = (item.description || "").toLowerCase();
+      if (searchText &&
+          !itemName.includes(searchText) &&
+          !category.includes(searchText) &&
+          !description.includes(searchText)) return;
       if (selectedCategory && category !== selectedCategory) return;
 
       lostCount++;
@@ -975,19 +1105,21 @@ async function loadItems() {
 
       const itemName = (item.itemName || "").toLowerCase();
       const category = (item.category || "").toLowerCase();
-      if (searchText && !itemName.includes(searchText) && !category.includes(searchText)) return;
+      const description = (item.description || "").toLowerCase();
+      if (searchText &&
+          !itemName.includes(searchText) &&
+          !category.includes(searchText) &&
+          !description.includes(searchText)) return;
       if (selectedCategory && category !== selectedCategory) return;
 
       foundCount++;
       if (foundItemsList) {
-        // Redacts uniqueMarks, privateNote, exact custody details for fraud prevention
         foundItemsList.innerHTML += `
           <div class="items-box">
             <h3>${item.itemName}</h3>
             <p><strong>Category:</strong> ${item.category}</p>
             <p><strong>General Description:</strong> ${item.description}</p>
             <p><strong>Date Found:</strong> ${item.dateFound}</p>
-            <p><strong>Found Near:</strong> ${item.locationFound}</p>
             <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
             ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
           </div>
@@ -1010,24 +1142,28 @@ if (searchInput) searchInput.addEventListener("input", loadItems);
 
 /* USER MY REPORTS CRUD */
 async function loadMyReports(userId) {
-  if (!myLostItemsList || !myFoundItemsList || !myClaimsList) return;
+  if (!myLostItemsList && !myFoundItemsList && !myClaimsList &&
+      !myResolvedLostItemsList && !myResolvedFoundItemsList && !myReviewedClaimsList) return;
 
   try {
     const [lostSnap, foundSnap, claimsSnap] = await Promise.all([
-      getDocs(collection(db, "lostItems")),
-      getDocs(collection(db, "foundItems")),
-      getDocs(collection(db, "claims"))
+      getDocs(query(collection(db, "lostItems"), where("userId", "==", userId))),
+      getDocs(query(collection(db, "foundItems"), where("userId", "==", userId))),
+      getDocs(query(collection(db, "claims"), where("userId", "==", userId)))
     ]);
 
-    myLostItemsList.innerHTML = "";
-    myFoundItemsList.innerHTML = "";
-    myClaimsList.innerHTML = "";
+    if (myLostItemsList) myLostItemsList.innerHTML = "";
+    if (myFoundItemsList) myFoundItemsList.innerHTML = "";
+    if (myClaimsList) myClaimsList.innerHTML = "";
+    if (myResolvedLostItemsList) myResolvedLostItemsList.innerHTML = "";
+    if (myResolvedFoundItemsList) myResolvedFoundItemsList.innerHTML = "";
+    if (myReviewedClaimsList) myReviewedClaimsList.innerHTML = "";
 
+    let activeLostCount = 0, resolvedLostCount = 0;
     lostSnap.forEach((docItem) => {
       const item = docItem.data();
-      if (item.userId !== userId) return;
-
-      myLostItemsList.innerHTML += `
+      const isResolved = normalizeText(item.status) === "resolved";
+      const card = `
         <div class="items-box">
           <h3>${item.itemName}</h3>
           <p><strong>Category:</strong> ${item.category}</p>
@@ -1037,18 +1173,29 @@ async function loadMyReports(userId) {
           <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
           ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
           <div class="action-row">
-            <button onclick="window.editLostReport('${docItem.id}')">Edit</button>
+            ${!isResolved ? `
+              <button onclick="window.markReturned('lost', '${docItem.id}')">Mark Returned</button>
+              <button onclick="window.editLostReport('${docItem.id}')">Edit</button>
+            ` : ""}
             <button onclick="window.deleteLostReport('${docItem.id}')">Delete</button>
           </div>
         </div>
       `;
+      if (isResolved) {
+        resolvedLostCount++;
+        if (myResolvedLostItemsList) myResolvedLostItemsList.innerHTML += card;
+      } else {
+        activeLostCount++;
+        if (myLostItemsList) myLostItemsList.innerHTML += card;
+      }
     });
 
+    let activeFoundCount = 0, resolvedFoundCount = 0;
     foundSnap.forEach((docItem) => {
       const item = docItem.data();
-      if (item.userId !== userId) return;
-
-      myFoundItemsList.innerHTML += `
+      const st = normalizeText(item.status);
+      const isClosed = st === "claimed" || st === "resolved";
+      const card = `
         <div class="items-box">
           <h3>${item.itemName}</h3>
           <p><strong>Category:</strong> ${item.category}</p>
@@ -1058,39 +1205,82 @@ async function loadMyReports(userId) {
           <p><strong>Status:</strong> ${getStatusBadge(item.status)}</p>
           ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.itemName}" class="item-thumb" />` : ""}
           <div class="action-row">
-            <button onclick="window.editFoundReport('${docItem.id}')">Edit</button>
+            ${!isClosed ? `
+              <button onclick="window.markReturned('found', '${docItem.id}')">Mark Returned</button>
+              <button onclick="window.editFoundReport('${docItem.id}')">Edit</button>
+            ` : ""}
             <button onclick="window.deleteFoundReport('${docItem.id}')">Delete</button>
           </div>
         </div>
       `;
+      if (isClosed) {
+        resolvedFoundCount++;
+        if (myResolvedFoundItemsList) myResolvedFoundItemsList.innerHTML += card;
+      } else {
+        activeFoundCount++;
+        if (myFoundItemsList) myFoundItemsList.innerHTML += card;
+      }
     });
 
+    let pendingClaimCount = 0, reviewedClaimCount = 0;
     claimsSnap.forEach((docItem) => {
       const item = docItem.data();
-      if (item.userId !== userId) return;
-
-      myClaimsList.innerHTML += `
+      const isPending = normalizeText(item.claimStatus) === "pending";
+      const card = `
         <div class="items-box">
           <h3>${item.itemName}</h3>
           <p><strong>Proof Submitted:</strong> ${item.reason}</p>
           <p><strong>Details:</strong> ${item.description}</p>
           <p><strong>Verification Status:</strong> ${getStatusBadge(item.claimStatus)}</p>
           <div class="action-row">
-            <button onclick="window.editClaimReport('${docItem.id}')">Edit</button>
+            ${isPending ? `<button onclick="window.editClaimReport('${docItem.id}')">Edit</button>` : ""}
             <button onclick="window.deleteClaimReport('${docItem.id}')">Delete</button>
           </div>
         </div>
       `;
+      if (isPending) {
+        pendingClaimCount++;
+        if (myClaimsList) myClaimsList.innerHTML += card;
+      } else {
+        reviewedClaimCount++;
+        if (myReviewedClaimsList) myReviewedClaimsList.innerHTML += card;
+      }
     });
 
-    if (myLostItemsList.innerHTML === "") myLostItemsList.innerHTML = "<p>You have no active lost item reports.</p>";
-    if (myFoundItemsList.innerHTML === "") myFoundItemsList.innerHTML = "<p>You have no active found item reports.</p>";
-    if (myClaimsList.innerHTML === "") myClaimsList.innerHTML = "<p>You have not submitted any claims.</p>";
+    if (myLostItemsList && activeLostCount === 0) myLostItemsList.innerHTML = "<p>You have no active lost item reports.</p>";
+    if (myFoundItemsList && activeFoundCount === 0) myFoundItemsList.innerHTML = "<p>You have no active found item reports.</p>";
+    if (myClaimsList && pendingClaimCount === 0) myClaimsList.innerHTML = "<p>You have no pending claims.</p>";
+    if (myResolvedLostItemsList && resolvedLostCount === 0) myResolvedLostItemsList.innerHTML = "<p>No resolved lost reports yet.</p>";
+    if (myResolvedFoundItemsList && resolvedFoundCount === 0) myResolvedFoundItemsList.innerHTML = "<p>No closed found reports yet.</p>";
+    if (myReviewedClaimsList && reviewedClaimCount === 0) myReviewedClaimsList.innerHTML = "<p>No reviewed claims yet.</p>";
     setupImageModal();
   } catch (err) {
     console.log(err);
   }
 }
+
+window.markReturned = async (type, id) => {
+  const collectionName = type === "lost" ? "lostItems" : "foundItems";
+  const statusValue = type === "lost" ? "resolved" : "claimed";
+  const label = type === "lost" ? "lost item report" : "found item report";
+
+  const res = await Swal.fire({
+    title: "Mark as Returned?",
+    text: `This will close your ${label}. Only do this if the item is truly back in the right hands.`,
+    icon: "question",
+    showCancelButton: true,
+    confirmButtonColor: "#1e3a8a",
+    confirmButtonText: "Yes, mark returned"
+  });
+  if (!res.isConfirmed) return;
+
+  await updateDoc(doc(db, collectionName, id), {
+    status: statusValue,
+    resolvedAt: new Date().toISOString()
+  });
+  showPopup("Report marked as returned. Thank you.", "success");
+  if (auth.currentUser) await loadMyReports(auth.currentUser.uid);
+};
 
 window.editLostReport = async (reportId) => {
   const refDoc = doc(db, "lostItems", reportId);
@@ -1194,12 +1384,12 @@ async function loadNotifications(userId) {
   notificationsList.innerHTML = "Loading notifications...";
 
   try {
-    const snapshot = await getDocs(collection(db, "notifications"));
+    const q = query(collection(db, "notifications"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
     const items = [];
 
     snapshot.forEach((docItem) => {
-      const data = docItem.data();
-      if (data.userId === userId) items.push({ id: docItem.id, ...data });
+      items.push({ id: docItem.id, ...docItem.data() });
     });
 
     items.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
@@ -1221,6 +1411,8 @@ async function loadNotifications(userId) {
       if (item.notificationKind === "possible_match") {
         clickAction = `onclick="window.location.href='./claim-item.html'"`;
       } else if (item.notificationKind === "claim_decision") {
+        clickAction = `onclick="window.location.href='./my-reports.html'"`;
+      } else if (item.notificationKind === "item_returned") {
         clickAction = `onclick="window.location.href='./my-reports.html'"`;
       }
 
@@ -1252,13 +1444,27 @@ if (notifBtn && notifDropdown) {
     notifDropdown.classList.toggle("show");
   });
   document.addEventListener("click", (e) => {
-    if (!notifDropdown.contains(e.target) && e.target !== notifBtn) {
+    if (!notifDropdown.contains(e.target) && !notifBtn.contains(e.target)) {
       notifDropdown.classList.remove("show");
     }
   });
 }
+/* DASHBOARD STATS */
+async function loadDashboardStats(userId) {
+  if (!dashboardClaimCount) return;
+  try {
+    const q = query(collection(db, "claims"), where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+    const pending = snapshot.docs.filter((d) => normalizeText(d.data().claimStatus) === "pending").length;
+    dashboardClaimCount.textContent = pending === 0
+      ? "You have no pending claims right now."
+      : `You have ${pending} pending claim${pending > 1 ? "s" : ""} awaiting admin review.`;
+  } catch (err) {
+    console.log(err);
+  }
+}
 
-/* ADMIN OVERVIEW & CLAIMS COMPARISON */
+/* ADMIN OVERVIEW */
 async function loadAdminOverview() {
   if (!adminLostCount && !adminFoundCount && !adminClaimsCount && !adminMatchesCount) return;
   try {
@@ -1270,21 +1476,29 @@ async function loadAdminOverview() {
     ]);
 
     let activeLost = 0, resolvedLost = 0;
-    lostSnap.forEach((d) => normalizeText(d.data().status) === "resolved" ? resolvedLost++ : activeLost++);
+    lostSnap.forEach((d) => {
+      if (normalizeText(d.data().status) === "resolved") resolvedLost++;
+      else activeLost++;
+    });
 
     let activeFound = 0, closedFound = 0;
     foundSnap.forEach((d) => {
       const st = normalizeText(d.data().status);
-      st === "claimed" || st === "resolved" ? closedFound++ : activeFound++;
+      if (st === "claimed" || st === "resolved") closedFound++;
+      else activeFound++;
     });
 
     let pendingClaims = 0, reviewedClaims = 0;
-    claimsSnap.forEach((d) => normalizeText(d.data().claimStatus) === "pending" ? pendingClaims++ : reviewedClaims++);
+    claimsSnap.forEach((d) => {
+      if (normalizeText(d.data().claimStatus) === "pending") pendingClaims++;
+      else reviewedClaims++;
+    });
 
     let openMatches = 0, archivedMatches = 0;
     matchesSnap.forEach((d) => {
       const st = normalizeText(d.data().status);
-      !st || st === "suggested" || st === "open" ? openMatches++ : archivedMatches++;
+      if (st === "archived") archivedMatches++;
+      else openMatches++;
     });
 
     if (adminLostCount) adminLostCount.textContent = `${activeLost} active`;
@@ -1326,7 +1540,6 @@ async function loadAdminData() {
     if (adminReviewedClaimsList) adminReviewedClaimsList.innerHTML = "";
     if (adminMatchesList) adminMatchesList.innerHTML = "";
 
-    // Admin Lost
     lostSnap.forEach((docItem) => {
       const item = docItem.data();
       const isResolved = normalizeText(item.status) === "resolved";
@@ -1347,7 +1560,6 @@ async function loadAdminData() {
       if (!isResolved && adminLostItemsList) adminLostItemsList.innerHTML += card;
     });
 
-    // Admin Found (with Admin-Only Confidential Data)
     foundSnap.forEach((docItem) => {
       const item = docItem.data();
       const isClosed = normalizeText(item.status) === "claimed" || normalizeText(item.status) === "resolved";
@@ -1370,7 +1582,6 @@ async function loadAdminData() {
       if (!isClosed && adminFoundItemsList) adminFoundItemsList.innerHTML += card;
     });
 
-    // Side-by-Side Claims Verification Comparison
     claimsSnap.forEach((docItem) => {
       const claim = docItem.data();
       const isPending = normalizeText(claim.claimStatus) === "pending";
@@ -1385,7 +1596,7 @@ async function loadAdminData() {
               <span class="helper-note">Submitted: ${new Date(claim.createdAt).toLocaleDateString()}</span>
             </div>
             <div>
-              <span class="theme-chip">Algorithmic Match Score: ${claim.matchScore || "N/A"}%</span>
+              <span class="theme-chip">Algorithmic Match Score: ${claim.matchScore || "N/A"}% • ${getConfidenceLabel(claim.matchScore || 0)} Confidence</span>
               ${getStatusBadge(claim.claimStatus)}
             </div>
           </div>
@@ -1417,6 +1628,7 @@ async function loadAdminData() {
               <p><strong>Item Title:</strong> ${found.itemName || "N/A"}</p>
               <p><strong>Category:</strong> ${found.category || "N/A"}</p>
               <p><strong>Public Description:</strong> ${found.description || "N/A"}</p>
+              <p class="admin-confidential-field"><strong>Exact Found Place:</strong> ${found.locationFound || "N/A"}</p>
               <p class="admin-confidential-field"><strong>Handed In At:</strong> ${found.handInLocation || "N/A"}</p>
               <p class="admin-confidential-field"><strong>Unique Marks (Secret):</strong> ${found.uniqueMarks || "None"}</p>
               <p class="admin-confidential-field"><strong>Admin Private Note:</strong> ${found.privateNote || "None"}</p>
@@ -1440,15 +1652,16 @@ async function loadAdminData() {
       if (!isPending && adminReviewedClaimsList) adminReviewedClaimsList.innerHTML += card;
     });
 
-    // Admin Match Suggestions
     if (adminMatchesList) {
       matchesSnap.forEach((docItem) => {
         const item = docItem.data();
+        if (normalizeText(item.status) === "archived") return;
+        const confidence = getConfidenceLabel(item.score || 0);
         adminMatchesList.innerHTML += `
           <div class="admin-box">
             <h3>${item.lostItemName} ↔ ${item.foundItemName}</h3>
             <p><strong>Category:</strong> ${item.category || "—"}</p>
-            <p><strong>Match Score:</strong> ${item.score || 0}%</p>
+            <p><strong>Match Score:</strong> ${item.score || 0}% • ${confidence} Confidence</p>
             <p><strong>Reasons:</strong> ${(item.reasons || []).join(", ") || "—"}</p>
           </div>
         `;
@@ -1504,13 +1717,11 @@ window.approveClaim = async (claimId) => {
 
     const claim = claimSnap.data();
 
-    // 1. Mark Claim Approved
     await updateDoc(claimRef, {
       claimStatus: "approved",
       reviewedAt: new Date().toISOString()
     });
 
-    // 2. Mark Lost Report Resolved in DB
     if (claim.lostItemId) {
       await updateDoc(doc(db, "lostItems", claim.lostItemId), {
         status: "resolved",
@@ -1518,15 +1729,49 @@ window.approveClaim = async (claimId) => {
       });
     }
 
-    // 3. Mark Found Report Claimed in DB
     if (claim.foundItemId) {
-      await updateDoc(doc(db, "foundItems", claim.foundItemId), {
+      const foundRef = doc(db, "foundItems", claim.foundItemId);
+      const foundSnap = await getDoc(foundRef);
+      let foundOwnerId = null;
+      let foundItemName = claim.itemName || "item";
+      if (foundSnap.exists()) {
+        const foundData = foundSnap.data();
+        foundOwnerId = foundData.userId;
+        foundItemName = foundData.itemName || foundItemName;
+      }
+
+      await updateDoc(foundRef, {
         status: "claimed",
         claimedAt: new Date().toISOString()
       });
+
+      if (foundOwnerId && foundOwnerId !== claim.userId) {
+        await createNotification(
+          foundOwnerId,
+          "Item Successfully Returned",
+          `The item you reported as found ("${foundItemName}") has been returned to its verified owner. Thank you.`,
+          "success",
+          { notificationKind: "item_returned" }
+        );
+      }
     }
 
-    // 4. Notify Claimant
+    if (claim.lostItemId && claim.foundItemId) {
+      const matchQ = query(
+        collection(db, "matchSuggestions"),
+        where("lostItemId", "==", claim.lostItemId)
+      );
+      const matchSnap = await getDocs(matchQ);
+      for (const mDoc of matchSnap.docs) {
+        if (mDoc.data().foundItemId === claim.foundItemId) {
+          await updateDoc(doc(db, "matchSuggestions", mDoc.id), {
+            status: "archived",
+            archivedAt: new Date().toISOString()
+          });
+        }
+      }
+    }
+
     await createNotification(
       claim.userId,
       "Claim Approved!",
@@ -1535,7 +1780,7 @@ window.approveClaim = async (claimId) => {
       { notificationKind: "claim_decision" }
     );
 
-    showPopup("Claim approved. Records updated to Resolved/Claimed in database.", "success");
+    showPopup("Claim approved. Records updated and match archived.", "success");
     await loadAdminData();
     await loadAdminOverview();
   } catch (err) {
@@ -1552,13 +1797,11 @@ window.rejectClaim = async (claimId) => {
 
     const claim = claimSnap.data();
 
-    // 1. Mark Claim Rejected (Lost & Found reports remain Active)
     await updateDoc(claimRef, {
       claimStatus: "rejected",
       reviewedAt: new Date().toISOString()
     });
 
-    // 2. Notify Claimant
     await createNotification(
       claim.userId,
       "Claim Rejected",
@@ -1688,7 +1931,8 @@ onAuthStateChanged(auth, async (user) => {
     if (path.includes("settings")) loadSettings(user);
     if (path.includes("profile")) loadProfile(user);
     if (path.includes("my-reports")) loadMyReports(user.uid);
-    if (claimLostItemSelect) loadUserLostReports(user.uid);
+    if (path.includes("dashboard") && !isAdminPage) loadDashboardStats(user.uid);
+        if (claimLostItemSelect) loadUserLostReports(user.uid);
     if (notificationsList) loadNotifications(user.uid);
   } else {
     if (navDashboard) navDashboard.style.display = "none";
